@@ -4,3 +4,7 @@ allowed:
   - bsd-3-clause
   - mit
   - unlicense
+
+ignored:
+  go:
+    - golang.org/x/**/*
