@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.14.7
+      - name: Build
+        uses: goreleaser/goreleaser-action@v2
+        with:
+          version: latest
+          args: --rm-dist --snapshot
+
+  test:
+    name: Test
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.14.7
+      - name: Test
+        run: go test .
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.14.7
+      - name: Check Modules
+        run: |
+          go mod tidy
+          if [ ! -z "$(git status --porcelain=v1)" ]; then
+            >&2 echo "Please run \`go mod tidy\` and commit the result."
+            exit 1
+          fi
+      - name: Lint
+        uses: golangci/golangci-lint-action@v1
+        with:
+          version: v1.29
+
+  licensedci:
+    name: Check Licenses
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.14.7
+      - name: Setup licensedci
+        uses: jonabc/setup-licensed@v1
+        with:
+          version: 2.x
+      - name: Run licensedci
+        run: licensed status
