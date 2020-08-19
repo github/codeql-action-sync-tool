@@ -1,0 +1,11 @@
+{
+	"tag_name": "some-codeql-version-on-v1-and-v2",
+	"name": "some-codeql-version-on-v1-and-v2",
+	"assets": [
+		{
+			"id": 2,
+			"name": "codeql-bundle.tar.gz",
+			"size": 68
+		}
+	]
+}

@@ -120,6 +120,10 @@ func (cacheDirectory *CacheDirectory) AssetsPath(release string) string {
 	return path.Join(cacheDirectory.ReleasePath(release), "assets")
 }
 
+func (cacheDirectory *CacheDirectory) AssetPath(release string, assetName string) string {
+	return path.Join(cacheDirectory.AssetsPath(release), assetName)
+}
+
 func (cacheDirectory *CacheDirectory) MetadataPath(release string) string {
 	return path.Join(cacheDirectory.ReleasePath(release), "metadata.json")
 }
