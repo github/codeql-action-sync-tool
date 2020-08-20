@@ -1,12 +1,12 @@
 ---
-name: github.com/google/go-github/github
-version: v17.0.0+incompatible
+name: github.com/google/go-github/v32/github
+version: v32.1.0
 type: go
 summary: Package github provides a client for using the GitHub API.
-homepage: https://godoc.org/github.com/google/go-github/github
+homepage: https://godoc.org/github.com/google/go-github/v32/github
 license: bsd-3-clause
 licenses:
-- sources: go-github@v17.0.0+incompatible/LICENSE
+- sources: v32@v32.1.0/LICENSE
   text: |
     Copyright (c) 2013 The go-github AUTHORS. All rights reserved.
 
@@ -35,7 +35,7 @@ licenses:
     THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
     OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-- sources: go-github@v17.0.0+incompatible/README.md
+- sources: v32@v32.1.0/README.md
   text: |-
     This library is distributed under the BSD-style license found in the [LICENSE](./LICENSE)
     file.
