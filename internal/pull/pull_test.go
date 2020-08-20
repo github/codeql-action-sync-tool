@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/github/codeql-action-sync/test"
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v32/github"
 )
 
 const initialActionRepository = "./pull_test/codeql-action-initial.git"

@@ -20,7 +20,7 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v32/github"
 	"github.com/pkg/errors"
 )
 
@@ -186,7 +186,7 @@ func (pullService *pullService) pullReleases() error {
 			if err != nil {
 				return errors.Wrap(err, "Error removing existing cached asset.")
 			}
-			reader, redirectURL, err := pullService.githubDotComClient.Repositories.DownloadReleaseAsset(pullService.ctx, sourceOwner, sourceRepository, asset.GetID())
+			reader, redirectURL, err := pullService.githubDotComClient.Repositories.DownloadReleaseAsset(pullService.ctx, sourceOwner, sourceRepository, asset.GetID(), http.DefaultClient)
 			if err != nil {
 				return errors.Wrap(err, "Error downloading asset.")
 			}
