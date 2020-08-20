@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/go-git/go-git/v5"
 	"github.com/pkg/errors"
 )
 
@@ -15,6 +16,8 @@ const errorCacheWrongVersion = "The cache you are trying to push was created wit
 const errorNotACacheOrEmpty = "The cache directory you have selected is not empty, but was not created by the CodeQL Action Sync tool. If you are sure you want to use this directory, please delete it and run the sync tool again."
 const errorCacheParentDoesNotExist = "Cannot create cache directory because its parent, does not exist."
 const errorPushNonCache = "The directory you have provided does not appear to be valid. Please check it exists and that you have run the `pull` command to populate it."
+
+const CacheReferencePrefix = "refs/remotes/" + git.DefaultRemoteName + "/"
 
 type CacheDirectory struct {
 	path string

@@ -2,5 +2,3 @@
 	repositoryformatversion = 0
 	filemode = true
 	bare = true
-[remote "origin"]
-	url = /tmp/codeql-sim

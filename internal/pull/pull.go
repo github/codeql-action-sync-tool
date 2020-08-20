@@ -81,8 +81,8 @@ func (pullService *pullService) pullGit(fresh bool) error {
 	err = localRepository.FetchContext(pullService.ctx, &git.FetchOptions{
 		RemoteName: git.DefaultRemoteName,
 		RefSpecs: []config.RefSpec{
-			config.RefSpec("+refs/heads/*:refs/remotes/" + git.DefaultRemoteName + "/heads/*"),
-			config.RefSpec("+refs/tags/*:refs/remotes/" + git.DefaultRemoteName + "/tags/*"),
+			config.RefSpec("+refs/heads/*:" + cachedirectory.CacheReferencePrefix + "heads/*"),
+			config.RefSpec("+refs/tags/*:" + cachedirectory.CacheReferencePrefix + "tags/*"),
 		},
 		Progress: os.Stderr,
 		Tags:     git.NoTags,
