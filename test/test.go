@@ -3,6 +3,7 @@ package test
 import (
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 
@@ -16,6 +17,18 @@ func CreateTemporaryDirectory(t *testing.T) string {
 		os.RemoveAll(directory)
 	})
 	return directory
+}
+
+func GetTestHTTPServer(t *testing.T) (*http.ServeMux, string) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(response http.ResponseWriter, request *http.Request) {
+		require.Failf(t, "Unexpected HTTP request: %s %s", request.Method, request.URL.Path)
+	})
+	server := httptest.NewServer(mux)
+	t.Cleanup(func() {
+		server.Close()
+	})
+	return mux, server.URL
 }
 
 func ServeHTTPResponseFromFile(t *testing.T, statusCode int, path string, response http.ResponseWriter) {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"io/ioutil"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/github/codeql-action-sync/internal/cachedirectory"
@@ -18,15 +17,6 @@ import (
 
 const initialActionRepository = "./pull_test/codeql-action-initial.git"
 const modifiedActionRepository = "./pull_test/codeql-action-modified.git"
-
-func getTestGitHubServer(t *testing.T) (*http.ServeMux, string) {
-	mux := http.NewServeMux()
-	server := httptest.NewServer(mux)
-	t.Cleanup(func() {
-		server.Close()
-	})
-	return mux, server.URL
-}
 
 func getTestPullService(t *testing.T, temporaryDirectory string, gitCloneURL string, githubURL string) pullService {
 	cacheDirectory := cachedirectory.NewCacheDirectory(temporaryDirectory)
@@ -131,7 +121,7 @@ func TestFindRelevantReleases(t *testing.T) {
 
 func TestPullReleases(t *testing.T) {
 	temporaryDirectory := test.CreateTemporaryDirectory(t)
-	githubTestServer, githubURL := getTestGitHubServer(t)
+	githubTestServer, githubURL := test.GetTestHTTPServer(t)
 	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/tags/some-codeql-version-on-main", func(response http.ResponseWriter, request *http.Request) {
 		test.ServeHTTPResponseFromFile(t, 200, "./pull_test/api/release-some-codeql-version-on-main.json", response)
 	})
@@ -158,7 +148,7 @@ func TestPullReleases(t *testing.T) {
 	// If we pull again, we should only download assets where the size mismatches.
 	err = ioutil.WriteFile(pullService.cacheDirectory.AssetPath("some-codeql-version-on-v1-and-v2", "codeql-bundle.tar.gz"), []byte("Some nonsense."), 0644)
 	require.NoError(t, err)
-	githubTestServer, githubURL = getTestGitHubServer(t)
+	githubTestServer, githubURL = test.GetTestHTTPServer(t)
 	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/tags/some-codeql-version-on-main", func(response http.ResponseWriter, request *http.Request) {
 		test.ServeHTTPResponseFromFile(t, 200, "./pull_test/api/release-some-codeql-version-on-main.json", response)
 	})
