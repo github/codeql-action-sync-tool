@@ -124,18 +124,16 @@ func TestPullReleases(t *testing.T) {
 	githubTestServer, githubURL := test.GetTestHTTPServer(t)
 	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/tags/some-codeql-version-on-main", func(response http.ResponseWriter, request *http.Request) {
 		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./pull_test/api/release-some-codeql-version-on-main.json", response)
-	})
+	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/assets/1", func(response http.ResponseWriter, request *http.Request) {
-		require.Equal(t, "application/octet-stream", request.Header.Get("accept"))
 		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./pull_test/api/asset-some-codeql-version-on-main.bin", response)
-	})
+	}).Methods("GET").Headers("accept", "application/octet-stream")
 	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/tags/some-codeql-version-on-v1-and-v2", func(response http.ResponseWriter, request *http.Request) {
 		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./pull_test/api/release-some-codeql-version-on-v1-and-v2.json", response)
-	})
+	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/assets/2", func(response http.ResponseWriter, request *http.Request) {
-		require.Equal(t, "application/octet-stream", request.Header.Get("accept"))
 		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./pull_test/api/asset-some-codeql-version-on-v1-and-v2.bin", response)
-	})
+	}).Methods("GET").Headers("accept", "application/octet-stream")
 	pullService := getTestPullService(t, temporaryDirectory, initialActionRepository, githubURL)
 	err := pullService.pullGit(true)
 	require.NoError(t, err)
@@ -151,14 +149,13 @@ func TestPullReleases(t *testing.T) {
 	githubTestServer, githubURL = test.GetTestHTTPServer(t)
 	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/tags/some-codeql-version-on-main", func(response http.ResponseWriter, request *http.Request) {
 		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./pull_test/api/release-some-codeql-version-on-main.json", response)
-	})
+	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/tags/some-codeql-version-on-v1-and-v2", func(response http.ResponseWriter, request *http.Request) {
 		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./pull_test/api/release-some-codeql-version-on-v1-and-v2.json", response)
-	})
+	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/assets/2", func(response http.ResponseWriter, request *http.Request) {
-		require.Equal(t, "application/octet-stream", request.Header.Get("accept"))
 		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./pull_test/api/asset-some-codeql-version-on-v1-and-v2.bin", response)
-	})
+	}).Methods("GET").Headers("accept", "application/octet-stream")
 	pullService = getTestPullService(t, temporaryDirectory, initialActionRepository, githubURL)
 	err = pullService.pullReleases()
 	require.NoError(t, err)

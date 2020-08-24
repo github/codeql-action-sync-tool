@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,8 +20,8 @@ func CreateTemporaryDirectory(t *testing.T) string {
 	return directory
 }
 
-func GetTestHTTPServer(t *testing.T) (*http.ServeMux, string) {
-	mux := http.NewServeMux()
+func GetTestHTTPServer(t *testing.T) (*mux.Router, string) {
+	mux := mux.NewRouter()
 	mux.HandleFunc("/", func(response http.ResponseWriter, request *http.Request) {
 		require.Failf(t, "Unexpected HTTP request: %s %s", request.Method, request.URL.Path)
 	})
