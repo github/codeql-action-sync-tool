@@ -58,7 +58,7 @@ func TestPullGitFresh(t *testing.T) {
 	pullService := getTestPullService(t, temporaryDirectory, initialActionRepository, "")
 	err := pullService.pullGit(true)
 	require.NoError(t, err)
-	checkExpectedReferencesInCache(t, pullService.cacheDirectory, []string{
+	test.CheckExpectedReferencesInRepository(t, pullService.cacheDirectory.GitPath(), []string{
 		"b9f01aa2c50f49898d4c7845a66be8824499fe9d refs/remotes/origin/heads/main",
 		"26936381e619a01122ea33993e3cebc474496805 refs/remotes/origin/heads/v1",
 		"e529a54fad10a936308b2220e05f7f00757f8e7c refs/remotes/origin/heads/v3",
@@ -93,7 +93,7 @@ func TestPullGitNotFreshWithChanges(t *testing.T) {
 	pullService = getTestPullService(t, temporaryDirectory, modifiedActionRepository, "")
 	err = pullService.pullGit(false)
 	require.NoError(t, err)
-	checkExpectedReferencesInCache(t, pullService.cacheDirectory, []string{
+	test.CheckExpectedReferencesInRepository(t, pullService.cacheDirectory.GitPath(), []string{
 		"b9f01aa2c50f49898d4c7845a66be8824499fe9d refs/remotes/origin/heads/main",
 		"26936381e619a01122ea33993e3cebc474496805 refs/remotes/origin/heads/v1",
 		"33d42021633d74bcd0bf9c95e3d3159131a5faa7 refs/remotes/origin/heads/v3", // v3 was force-pushed, and should have been force-pulled too.
