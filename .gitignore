@@ -1,2 +1,3 @@
 /codeql-action-sync
 /dist/
+/pkged.go

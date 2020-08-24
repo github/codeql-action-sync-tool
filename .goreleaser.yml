@@ -1,5 +1,9 @@
 project_name: codeql-action-sync
 
+before:
+  hooks:
+    - pkger
+
 builds:
   - goos: [linux, darwin, windows]
     goarch: [386, amd64, arm64]
