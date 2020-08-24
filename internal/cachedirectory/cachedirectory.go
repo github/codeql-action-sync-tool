@@ -25,7 +25,7 @@ type CacheDirectory struct {
 
 func NewCacheDirectory(path string) CacheDirectory {
 	return CacheDirectory{
-		path: path,
+		path: filepath.Clean(path),
 	}
 }
 
