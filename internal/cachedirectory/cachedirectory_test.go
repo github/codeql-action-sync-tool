@@ -81,3 +81,10 @@ func TestErrorIfPushNonExistent(t *testing.T) {
 	err := cacheDirectory.CheckOrCreateVersionFile(false, aVersion)
 	require.EqualError(t, err, errorPushNonCache)
 }
+
+func TestCreateCacheDirectoryWithTrailingSlash(t *testing.T) {
+	temporaryDirectory := test.CreateTemporaryDirectory(t)
+	cacheDirectory := NewCacheDirectory(path.Join(temporaryDirectory, "cache") + string(os.PathSeparator))
+	err := cacheDirectory.CheckOrCreateVersionFile(true, aVersion)
+	require.NoError(t, err)
+}
