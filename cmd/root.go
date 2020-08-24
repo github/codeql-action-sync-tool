@@ -51,6 +51,7 @@ func Execute(ctx context.Context) error {
 	}
 
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(licensesCmd)
 
 	rootCmd.AddCommand(pullCmd)
 	pullFlags.Init(pullCmd)
