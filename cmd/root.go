@@ -58,5 +58,9 @@ func Execute(ctx context.Context) error {
 	rootCmd.AddCommand(pushCmd)
 	pushFlags.Init(pushCmd)
 
+	rootCmd.AddCommand(syncCmd)
+	pullFlags.Init(syncCmd)
+	pushFlags.Init(syncCmd)
+
 	return rootCmd.ExecuteContext(ctx)
 }
