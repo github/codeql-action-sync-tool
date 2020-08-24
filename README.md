@@ -41,3 +41,6 @@ Now use the `./codeql-action-sync push` command to upload the CodeQL Action and 
 **Optional Arguments:**
 * `--cache-dir` - The directory to which the Action was previously downloaded.
 * `--destination-repository` - The name of the repository in which to create or update the CodeQL Action. If not specified `github/codeql-action` will be used.
+
+## Contributing
+For more details on contributing improvements to this tool, see our [contributor guide](CONTRIBUTING.md).
