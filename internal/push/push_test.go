@@ -44,13 +44,13 @@ func TestCreateRepositoryWhenUserIsOwner(t *testing.T) {
 	githubTestServer, githubEnterpriseURL := test.GetTestHTTPServer(t)
 	pushService := getTestPushService(t, temporaryDirectory, githubEnterpriseURL)
 	githubTestServer.HandleFunc("/api/v3/user", func(response http.ResponseWriter, request *http.Request) {
-		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./push_test/api/user-is-owner.json", response)
+		test.ServeHTTPResponseFromObject(t, github.User{Login: github.String("destination-repository-owner")}, response)
 	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/repos/destination-repository-owner/destination-repository-name", func(response http.ResponseWriter, request *http.Request) {
 		response.WriteHeader(http.StatusNotFound)
 	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/user/repos", func(response http.ResponseWriter, request *http.Request) {
-		response.Write([]byte("{}"))
+		test.ServeHTTPResponseFromObject(t, github.Repository{}, response)
 	}).Methods("POST")
 	_, err := pushService.createRepository()
 	require.NoError(t, err)
@@ -61,13 +61,13 @@ func TestUpdateRepositoryWhenUserIsOwner(t *testing.T) {
 	githubTestServer, githubEnterpriseURL := test.GetTestHTTPServer(t)
 	pushService := getTestPushService(t, temporaryDirectory, githubEnterpriseURL)
 	githubTestServer.HandleFunc("/api/v3/user", func(response http.ResponseWriter, request *http.Request) {
-		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./push_test/api/user-is-owner.json", response)
+		test.ServeHTTPResponseFromObject(t, github.User{Login: github.String("destination-repository-owner")}, response)
 	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/repos/destination-repository-owner/destination-repository-name", func(response http.ResponseWriter, request *http.Request) {
 		test.ServeHTTPResponseFromObject(t, github.Repository{Homepage: github.String(repositoryHomepage)}, response)
 	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/repos/destination-repository-owner/destination-repository-name", func(response http.ResponseWriter, request *http.Request) {
-		response.Write([]byte("{}"))
+		test.ServeHTTPResponseFromObject(t, github.Repository{}, response)
 	}).Methods("PATCH")
 	_, err := pushService.createRepository()
 	require.NoError(t, err)
@@ -78,7 +78,7 @@ func TestUpdateRepositoryWhenUserIsOwnerForced(t *testing.T) {
 	githubTestServer, githubEnterpriseURL := test.GetTestHTTPServer(t)
 	pushService := getTestPushService(t, temporaryDirectory, githubEnterpriseURL)
 	githubTestServer.HandleFunc("/api/v3/user", func(response http.ResponseWriter, request *http.Request) {
-		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./push_test/api/user-is-owner.json", response)
+		test.ServeHTTPResponseFromObject(t, github.User{Login: github.String("destination-repository-owner")}, response)
 	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/repos/destination-repository-owner/destination-repository-name", func(response http.ResponseWriter, request *http.Request) {
 		test.ServeHTTPResponseFromObject(t, github.Repository{}, response)
@@ -99,24 +99,24 @@ func TestCreateOrganizationAndRepositoryWhenOrganizationIsOwner(t *testing.T) {
 	pushService := getTestPushService(t, temporaryDirectory, githubEnterpriseURL)
 	organizationCreated := false
 	githubTestServer.HandleFunc("/api/v3/user", func(response http.ResponseWriter, request *http.Request) {
-		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./push_test/api/user-is-not-owner.json", response)
+		test.ServeHTTPResponseFromObject(t, github.User{Login: github.String("user")}, response)
 	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/orgs/destination-repository-owner", func(response http.ResponseWriter, request *http.Request) {
 		if organizationCreated {
-			response.Write([]byte("{}"))
+			test.ServeHTTPResponseFromObject(t, github.Organization{}, response)
 		} else {
 			response.WriteHeader(http.StatusNotFound)
 		}
 	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/admin/organizations", func(response http.ResponseWriter, request *http.Request) {
-		response.Write([]byte("{}"))
+		test.ServeHTTPResponseFromObject(t, github.Organization{}, response)
 		organizationCreated = true
 	}).Methods("POST")
 	githubTestServer.HandleFunc("/api/v3/repos/destination-repository-owner/destination-repository-name", func(response http.ResponseWriter, request *http.Request) {
 		response.WriteHeader(http.StatusNotFound)
 	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/orgs/destination-repository-owner/repos", func(response http.ResponseWriter, request *http.Request) {
-		response.Write([]byte("{}"))
+		test.ServeHTTPResponseFromObject(t, github.Repository{}, response)
 	}).Methods("POST")
 	_, err := pushService.createRepository()
 	require.NoError(t, err)
