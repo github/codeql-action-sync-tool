@@ -168,6 +168,11 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 			return errors.Wrap(err, "Error pushing Action to GitHub Enterprise Server.")
 		}
 	}
+
+	err = gitRepository.DeleteRemote(remoteName)
+	if err != nil {
+		return errors.Wrap(err, "Error removing repository remote.")
+	}
 	return nil
 }
 
