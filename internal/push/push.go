@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"mime"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/github/codeql-action-sync/internal/cachedirectory"
 	"github.com/github/codeql-action-sync/internal/version"
@@ -41,7 +42,7 @@ type pushService struct {
 }
 
 func (pushService *pushService) createRepository() (*github.Repository, error) {
-	log.Printf("Ensuring repository exists...")
+	log.Debug("Ensuring repository exists...")
 	user, _, err := pushService.githubEnterpriseClient.Users.Get(pushService.ctx, "")
 	if err != nil {
 		return nil, errors.Wrap(err, "Error getting current user.")
@@ -59,7 +60,7 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 			return nil, errors.Wrap(err, "Error checking if destination organization exists.")
 		}
 		if response.StatusCode == http.StatusNotFound {
-			log.Printf("The organization %s does not exist. Creating it...", pushService.destinationRepositoryOwner)
+			log.Debugf("The organization %s does not exist. Creating it...", pushService.destinationRepositoryOwner)
 			_, _, err := pushService.githubEnterpriseClient.Admin.CreateOrg(pushService.ctx, &github.Organization{
 				Login: github.String(pushService.destinationRepositoryOwner),
 				Name:  github.String(pushService.destinationRepositoryOwner),
@@ -106,9 +107,9 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 func (pushService *pushService) pushGit(repository *github.Repository, initialPush bool) error {
 	remoteURL := repository.GetCloneURL()
 	if initialPush {
-		log.Printf("Pushing Git releases to %s...", remoteURL)
+		log.Debugf("Pushing Git releases to %s...", remoteURL)
 	} else {
-		log.Printf("Pushing Git references to %s...", remoteURL)
+		log.Debugf("Pushing Git references to %s...", remoteURL)
 	}
 	gitRepository, err := git.PlainOpen(pushService.cacheDirectory.GitPath())
 	if err != nil {
@@ -190,7 +191,7 @@ func (pushService *pushService) createOrUpdateRelease(releaseName string) (*gith
 		return nil, errors.Wrap(err, "Error checking for existing CodeQL release.")
 	}
 	if release == nil {
-		log.Printf("Creating release %s...", releaseMetadata.GetTagName())
+		log.Debugf("Creating release %s...", releaseMetadata.GetTagName())
 		release, _, err := pushService.githubEnterpriseClient.Repositories.CreateRelease(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, &releaseMetadata)
 		if err != nil {
 			return nil, errors.Wrap(err, "Error creating release.")
@@ -199,7 +200,7 @@ func (pushService *pushService) createOrUpdateRelease(releaseName string) (*gith
 	}
 	release, _, err = pushService.githubEnterpriseClient.Repositories.EditRelease(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, release.GetID(), &releaseMetadata)
 	if err != nil {
-		log.Printf("Updating release %s...", releaseMetadata.GetTagName())
+		log.Debugf("Updating release %s...", releaseMetadata.GetTagName())
 		return nil, errors.Wrap(err, "Error updating release.")
 	}
 	return release, nil
@@ -231,7 +232,7 @@ func (pushService *pushService) createOrUpdateReleaseAsset(release *github.Repos
 			}
 		}
 	}
-	log.Printf("Uploading release asset %s...", assetPathStat.Name())
+	log.Debugf("Uploading release asset %s...", assetPathStat.Name())
 	assetFile, err := os.Open(pushService.cacheDirectory.AssetPath(release.GetTagName(), assetPathStat.Name()))
 	defer assetFile.Close()
 	progressReader := &ioprogress.Reader{
@@ -250,7 +251,7 @@ func (pushService *pushService) createOrUpdateReleaseAsset(release *github.Repos
 }
 
 func (pushService *pushService) pushReleases() error {
-	log.Print("Pushing CodeQL bundles...")
+	log.Debugf("Pushing CodeQL bundles...")
 	releasesPath := pushService.cacheDirectory.ReleasesPath()
 
 	releasePathStats, err := ioutil.ReadDir(releasesPath)
@@ -348,6 +349,6 @@ func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, des
 	if err != nil {
 		return err
 	}
-	log.Printf("Finished pushing CodeQL Action to %s!", destinationRepository)
+	log.Infof("Finished pushing CodeQL Action to %s!", destinationRepository)
 	return nil
 }

@@ -1,6 +1,6 @@
 package version
 
-import "log"
+import log "github.com/sirupsen/logrus"
 
 var version = "development"
 var commit = "0000000000000000000000000000000000000000"
@@ -14,5 +14,5 @@ func Commit() string {
 }
 
 func LogVersion() {
-	log.Printf("Starting CodeQL Action sync tool version %s...", Version())
+	log.Infof("Starting CodeQL Action sync tool version %s...", Version())
 }
