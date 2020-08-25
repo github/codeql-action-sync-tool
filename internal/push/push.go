@@ -60,15 +60,10 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 		}
 		if response.StatusCode == http.StatusNotFound {
 			log.Printf("The organization %s does not exist. Creating it...", pushService.destinationRepositoryOwner)
-			createOrganizationRequest, err := pushService.githubEnterpriseClient.NewRequest("POST", "admin/organizations", map[string]interface{}{
-				"login":        pushService.destinationRepositoryOwner,
-				"profile_name": pushService.destinationRepositoryOwner,
-				"admin":        user.GetLogin(),
-			})
-			if err != nil {
-				return nil, errors.Wrap(err, "Error checking if destination organization exists.")
-			}
-			response, err = pushService.githubEnterpriseClient.Do(pushService.ctx, createOrganizationRequest, nil)
+			_, _, err := pushService.githubEnterpriseClient.Admin.CreateOrg(pushService.ctx, &github.Organization{
+				Login: github.String(pushService.destinationRepositoryOwner),
+				Name:  github.String(pushService.destinationRepositoryOwner),
+			}, user.GetLogin())
 			if err != nil {
 				return nil, errors.Wrap(err, "Error creating organization.")
 			}
