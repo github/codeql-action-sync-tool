@@ -14,7 +14,7 @@ var syncCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		version.LogVersion()
 		cacheDirectory := cachedirectory.NewCacheDirectory(rootFlags.cacheDir)
-		err := pull.Pull(cmd.Context(), cacheDirectory)
+		err := pull.Pull(cmd.Context(), cacheDirectory, pullFlags.sourceToken)
 		if err != nil {
 			return err
 		}
