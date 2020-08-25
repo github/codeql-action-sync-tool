@@ -103,8 +103,41 @@ func (cacheDirectory *CacheDirectory) CheckOrCreateVersionFile(pull bool, versio
 	return errors.New(errorPushNonCache)
 }
 
+func (cacheDirectory *CacheDirectory) Lock() error {
+	file, err := os.Create(cacheDirectory.lockFilePath())
+	if err != nil {
+		return errors.Wrap(err, "Error locking cache directory.")
+	}
+	defer file.Close()
+	// If the cache directory is already locked, it's not really a huge issue since the purpose of the lock is mostly to check whether a `pull` operation was interrupted before pushing.
+	return nil
+}
+
+func (cacheDirectory *CacheDirectory) Unlock() error {
+	err := os.Remove(cacheDirectory.lockFilePath())
+	if err != nil {
+		return errors.Wrap(err, "Error unlocking cache directory.")
+	}
+	return nil
+}
+
+func (cacheDirectory *CacheDirectory) CheckLock() error {
+	_, err := os.Stat(cacheDirectory.lockFilePath())
+	if err == nil {
+		return errors.New("The cache directory is locked, likely due to a `pull` command being interrupted. Please run `pull` again to ensure all required data is downloaded.")
+	}
+	if os.IsNotExist(err) {
+		return nil
+	}
+	return errors.Wrap(err, "Error checking if cache directory is locked.")
+}
+
 func (cacheDirectory *CacheDirectory) versionFilePath() string {
 	return path.Join(cacheDirectory.path, ".codeql-actions-sync-version")
+}
+
+func (cacheDirectory *CacheDirectory) lockFilePath() string {
+	return path.Join(cacheDirectory.path, ".codeql-actions-sync-lock")
 }
 
 func (cacheDirectory *CacheDirectory) GitPath() string {

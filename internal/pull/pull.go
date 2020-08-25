@@ -237,6 +237,10 @@ func Pull(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, sou
 	if err != nil {
 		return err
 	}
+	err = cacheDirectory.Lock()
+	if err != nil {
+		return err
+	}
 
 	var tokenClient *http.Client
 	if sourceToken != "" {
@@ -263,6 +267,11 @@ func Pull(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, sou
 		}
 	}
 	err = pullService.pullReleases()
+	if err != nil {
+		return err
+	}
+
+	err = cacheDirectory.Unlock()
 	if err != nil {
 		return err
 	}
