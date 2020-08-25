@@ -13,6 +13,7 @@ import (
 
 	"github.com/github/codeql-action-sync/internal/actionconfiguration"
 	"github.com/mitchellh/ioprogress"
+	"golang.org/x/oauth2"
 
 	"github.com/github/codeql-action-sync/internal/cachedirectory"
 	"github.com/github/codeql-action-sync/internal/version"
@@ -20,6 +21,7 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/google/go-github/v32/github"
 	"github.com/pkg/errors"
 )
@@ -37,6 +39,7 @@ type pullService struct {
 	cacheDirectory     cachedirectory.CacheDirectory
 	gitCloneURL        string
 	githubDotComClient *github.Client
+	sourceToken        string
 }
 
 func (pullService *pullService) pullGit(fresh bool) error {
@@ -78,6 +81,14 @@ func (pullService *pullService) pullGit(fresh bool) error {
 		return errors.Wrap(err, "Error setting Git remote.")
 	}
 
+	var credentials *githttp.BasicAuth
+	if pullService.sourceToken != "" {
+		credentials = &githttp.BasicAuth{
+			Username: "x-access-token",
+			Password: pullService.sourceToken,
+		}
+	}
+
 	err = localRepository.FetchContext(pullService.ctx, &git.FetchOptions{
 		RemoteName: git.DefaultRemoteName,
 		RefSpecs: []config.RefSpec{
@@ -87,6 +98,7 @@ func (pullService *pullService) pullGit(fresh bool) error {
 		Progress: os.Stderr,
 		Tags:     git.NoTags,
 		Force:    true,
+		Auth:     credentials,
 	})
 	if err != nil && err != git.NoErrAlreadyUpToDate {
 		return errors.Wrap(err, "Error doing Git fetch.")
@@ -220,17 +232,26 @@ func (pullService *pullService) pullReleases() error {
 	return nil
 }
 
-func Pull(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory) error {
+func Pull(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, sourceToken string) error {
 	err := cacheDirectory.CheckOrCreateVersionFile(true, version.Version())
 	if err != nil {
 		return err
+	}
+
+	var tokenClient *http.Client
+	if sourceToken != "" {
+		tokenSource := oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: sourceToken},
+		)
+		tokenClient = oauth2.NewClient(ctx, tokenSource)
 	}
 
 	pullService := pullService{
 		ctx:                ctx,
 		cacheDirectory:     cacheDirectory,
 		gitCloneURL:        sourceURL,
-		githubDotComClient: github.NewClient(nil),
+		githubDotComClient: github.NewClient(tokenClient),
+		sourceToken:        sourceToken,
 	}
 
 	err = pullService.pullGit(false)
