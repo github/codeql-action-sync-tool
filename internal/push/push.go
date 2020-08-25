@@ -3,6 +3,7 @@ package push
 import (
 	"context"
 	"encoding/json"
+	usererrors "errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,6 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/github/codeql-action-sync/internal/githubapiutil"
 
 	log "github.com/sirupsen/logrus"
 
@@ -30,6 +33,7 @@ const remoteName = "enterprise"
 const repositoryHomepage = "https://github.com/github/codeql-action-sync-tool/"
 
 const errorAlreadyExists = "The destination repository already exists, but it was not created with the CodeQL Action sync tool. If you are sure you want to push the CodeQL Action to it, re-run this command with the `--force` flag."
+const errorInvalidDestinationToken = "The destination token you've provided is not valid."
 
 type pushService struct {
 	ctx                        context.Context
@@ -43,8 +47,11 @@ type pushService struct {
 
 func (pushService *pushService) createRepository() (*github.Repository, error) {
 	log.Debug("Ensuring repository exists...")
-	user, _, err := pushService.githubEnterpriseClient.Users.Get(pushService.ctx, "")
+	user, response, err := pushService.githubEnterpriseClient.Users.Get(pushService.ctx, "")
 	if err != nil {
+		if response.StatusCode == http.StatusUnauthorized {
+			return nil, usererrors.New(errorInvalidDestinationToken)
+		}
 		return nil, errors.Wrap(err, "Error getting current user.")
 	}
 
@@ -66,6 +73,9 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 				Name:  github.String(pushService.destinationRepositoryOwner),
 			}, user.GetLogin())
 			if err != nil {
+				if response.StatusCode == http.StatusNotFound && githubapiutil.MissingAllScopes(response, "site_admin") {
+					return nil, usererrors.New("The destination token you have provided does not have the `site_admin` scope, so the destination organization cannot be created.")
+				}
 				return nil, errors.Wrap(err, "Error creating organization.")
 			}
 		}
@@ -90,13 +100,19 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 		Private:      github.Bool(false),
 	}
 	if response.StatusCode == http.StatusNotFound {
-		repository, _, err = pushService.githubEnterpriseClient.Repositories.Create(pushService.ctx, destinationOrganization, &desiredRepositoryProperties)
+		repository, response, err = pushService.githubEnterpriseClient.Repositories.Create(pushService.ctx, destinationOrganization, &desiredRepositoryProperties)
 		if err != nil {
+			if response.StatusCode == http.StatusNotFound && githubapiutil.MissingAllScopes(response, "public_repo", "repo") {
+				return nil, usererrors.New("The destination token you have provided does not have the `public_repo` scope.")
+			}
 			return nil, errors.Wrap(err, "Error creating destination repository.")
 		}
 	} else {
-		repository, _, err = pushService.githubEnterpriseClient.Repositories.Edit(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, &desiredRepositoryProperties)
+		repository, response, err = pushService.githubEnterpriseClient.Repositories.Edit(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, &desiredRepositoryProperties)
 		if err != nil {
+			if response.StatusCode == http.StatusNotFound && githubapiutil.MissingAllScopes(response, "public_repo", "repo") {
+				return nil, usererrors.New("The destination token you have provided does not have the `public_repo` scope.")
+			}
 			return nil, errors.Wrap(err, "Error updating destination repository.")
 		}
 	}

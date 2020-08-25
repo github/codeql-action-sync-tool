@@ -95,7 +95,7 @@ func TestLocking(t *testing.T) {
 	require.NoError(t, cacheDirectory.CheckOrCreateVersionFile(true, aVersion))
 	require.NoError(t, cacheDirectory.Lock())
 	require.NoError(t, cacheDirectory.Lock())
-	require.Error(t, cacheDirectory.CheckLock())
+	require.EqualError(t, cacheDirectory.CheckLock(), errorCacheLocked)
 	require.NoError(t, cacheDirectory.Unlock())
 	require.NoError(t, cacheDirectory.CheckLock())
 }
