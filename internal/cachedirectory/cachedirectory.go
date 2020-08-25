@@ -1,7 +1,7 @@
 package cachedirectory
 
 import (
-	"fmt"
+	usererrors "errors"
 	"io"
 	"io/ioutil"
 	"os"
@@ -15,7 +15,8 @@ import (
 const errorCacheWrongVersion = "The cache you are trying to push was created with an old version of the CodeQL Action Sync tool. Please re-pull it with this version of the tool."
 const errorNotACacheOrEmpty = "The cache directory you have selected is not empty, but was not created by the CodeQL Action Sync tool. If you are sure you want to use this directory, please delete it and run the sync tool again."
 const errorCacheParentDoesNotExist = "Cannot create cache directory because its parent, does not exist."
-const errorPushNonCache = "The directory you have provided does not appear to be valid. Please check it exists and that you have run the `pull` command to populate it."
+const errorPushNonCache = "The cache directory you have provided does not appear to be valid. Please check it exists and that you have run the `pull` command to populate it."
+const errorCacheLocked = "The cache directory is locked, likely due to a `pull` command being interrupted. Please run `pull` again to ensure all required data is downloaded."
 
 const CacheReferencePrefix = "refs/remotes/" + git.DefaultRemoteName + "/"
 
@@ -35,7 +36,7 @@ func isEmptyOrNonExistentDirectory(path string) (bool, error) {
 		if os.IsNotExist(err) {
 			return true, nil
 		}
-		return false, errors.Wrap(err, fmt.Sprintf("Could not access directory %s.", path))
+		return false, errors.Wrapf(err, "Could not access directory %s.", path)
 	}
 	defer f.Close()
 
@@ -44,7 +45,7 @@ func isEmptyOrNonExistentDirectory(path string) (bool, error) {
 		if err == io.EOF {
 			return true, nil
 		}
-		return false, errors.Wrap(err, fmt.Sprintf("Could not read contents of directory %s.", path))
+		return false, errors.Wrapf(err, "Could not read contents of directory %s.", path)
 	}
 	return false, nil
 }
@@ -67,7 +68,7 @@ func (cacheDirectory *CacheDirectory) CheckOrCreateVersionFile(pull bool, versio
 		_, err := os.Stat(cacheParentPath)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return errors.New(errorCacheParentDoesNotExist)
+				return usererrors.New(errorCacheParentDoesNotExist)
 			}
 			return errors.Wrap(err, "Could not access parent path of cache directory.")
 		}
@@ -94,13 +95,13 @@ func (cacheDirectory *CacheDirectory) CheckOrCreateVersionFile(pull bool, versio
 			}
 			return nil
 		}
-		return errors.New(errorNotACacheOrEmpty)
+		return usererrors.New(errorNotACacheOrEmpty)
 	}
 
 	if cacheVersionFileExists {
-		return errors.New(errorCacheWrongVersion)
+		return usererrors.New(errorCacheWrongVersion)
 	}
-	return errors.New(errorPushNonCache)
+	return usererrors.New(errorPushNonCache)
 }
 
 func (cacheDirectory *CacheDirectory) Lock() error {
@@ -124,7 +125,7 @@ func (cacheDirectory *CacheDirectory) Unlock() error {
 func (cacheDirectory *CacheDirectory) CheckLock() error {
 	_, err := os.Stat(cacheDirectory.lockFilePath())
 	if err == nil {
-		return errors.New("The cache directory is locked, likely due to a `pull` command being interrupted. Please run `pull` again to ensure all required data is downloaded.")
+		return usererrors.New(errorCacheLocked)
 	}
 	if os.IsNotExist(err) {
 		return nil
