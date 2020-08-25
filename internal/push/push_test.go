@@ -64,15 +64,32 @@ func TestUpdateRepositoryWhenUserIsOwner(t *testing.T) {
 		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./push_test/api/user-is-owner.json", response)
 	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/repos/destination-repository-owner/destination-repository-name", func(response http.ResponseWriter, request *http.Request) {
-		response.Write([]byte("{}"))
+		test.ServeHTTPResponseFromObject(t, github.Repository{Homepage: github.String(repositoryHomepage)}, response)
 	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/repos/destination-repository-owner/destination-repository-name", func(response http.ResponseWriter, request *http.Request) {
 		response.Write([]byte("{}"))
 	}).Methods("PATCH")
-	githubTestServer.HandleFunc("/api/v3/user/repos", func(response http.ResponseWriter, request *http.Request) {
-		response.Write([]byte("{}"))
-	}).Methods("POST")
 	_, err := pushService.createRepository()
+	require.NoError(t, err)
+}
+
+func TestUpdateRepositoryWhenUserIsOwnerForced(t *testing.T) {
+	temporaryDirectory := test.CreateTemporaryDirectory(t)
+	githubTestServer, githubEnterpriseURL := test.GetTestHTTPServer(t)
+	pushService := getTestPushService(t, temporaryDirectory, githubEnterpriseURL)
+	githubTestServer.HandleFunc("/api/v3/user", func(response http.ResponseWriter, request *http.Request) {
+		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./push_test/api/user-is-owner.json", response)
+	}).Methods("GET")
+	githubTestServer.HandleFunc("/api/v3/repos/destination-repository-owner/destination-repository-name", func(response http.ResponseWriter, request *http.Request) {
+		test.ServeHTTPResponseFromObject(t, github.Repository{}, response)
+	}).Methods("GET")
+	githubTestServer.HandleFunc("/api/v3/repos/destination-repository-owner/destination-repository-name", func(response http.ResponseWriter, request *http.Request) {
+		test.ServeHTTPResponseFromObject(t, github.Repository{}, response)
+	}).Methods("PATCH")
+	_, err := pushService.createRepository()
+	require.EqualError(t, err, errorAlreadyExists)
+	pushService.force = true
+	_, err = pushService.createRepository()
 	require.NoError(t, err)
 }
 
