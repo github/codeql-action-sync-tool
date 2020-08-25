@@ -36,11 +36,8 @@ func GetTestHTTPServer(t *testing.T) (*mux.Router, string) {
 	return mux, server.URL
 }
 
-func ServeHTTPResponseFromFile(t *testing.T, statusCode int, path string, response http.ResponseWriter) {
-	data, err := ioutil.ReadFile(path)
-	require.NoError(t, err)
-	response.WriteHeader(statusCode)
-	_, err = response.Write(data)
+func ServeHTTPResponseFromString(t *testing.T, content string, response http.ResponseWriter) {
+	_, err := response.Write([]byte(content))
 	require.NoError(t, err)
 }
 
@@ -51,12 +48,10 @@ func ServeHTTPResponseFromObject(t *testing.T, object interface{}, response http
 	require.NoError(t, err)
 }
 
-func RequireFilesAreEqual(t *testing.T, expectedPath string, actualPath string) {
-	expectedData, err := ioutil.ReadFile(expectedPath)
-	require.NoError(t, err)
+func RequireFileHasContent(t *testing.T, expectedContent string, actualPath string) {
 	actualData, err := ioutil.ReadFile(actualPath)
 	require.NoError(t, err)
-	require.Equal(t, expectedData, actualData)
+	require.Equal(t, []byte(expectedContent), actualData)
 }
 
 func CheckExpectedReferencesInRepository(t *testing.T, repositoryPath string, expectedReferences []string) {

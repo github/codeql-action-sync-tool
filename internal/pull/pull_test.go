@@ -18,6 +18,34 @@ import (
 const initialActionRepository = "./pull_test/codeql-action-initial.git"
 const modifiedActionRepository = "./pull_test/codeql-action-modified.git"
 
+const releaseSomeCodeQLVersionOnMainContent = "This isn't really a CodeQL bundle!"
+
+var releaseSomeCodeQLVersionOnMain = github.RepositoryRelease{
+	TagName: github.String("some-codeql-version-on-main"),
+	Name:    github.String("some-codeql-version-on-main"),
+	Assets: []*github.ReleaseAsset{
+		&github.ReleaseAsset{
+			ID:   github.Int64(1),
+			Name: github.String("codeql-bundle.tar.gz"),
+			Size: github.Int(len(releaseSomeCodeQLVersionOnMainContent)),
+		},
+	},
+}
+
+const releaseSomeCodeQLVersionOnV1AndV2Content = "This isn't a CodeQL bundle either, but it's a different not-bundle."
+
+var releaseSomeCodeQLVersionOnV1AndV2 = github.RepositoryRelease{
+	TagName: github.String("some-codeql-version-on-v1-and-v2"),
+	Name:    github.String("some-codeql-version-on-v1-and-v2"),
+	Assets: []*github.ReleaseAsset{
+		&github.ReleaseAsset{
+			ID:   github.Int64(2),
+			Name: github.String("codeql-bundle.tar.gz"),
+			Size: github.Int(len(releaseSomeCodeQLVersionOnV1AndV2Content)),
+		},
+	},
+}
+
 func getTestPullService(t *testing.T, temporaryDirectory string, gitCloneURL string, githubURL string) pullService {
 	cacheDirectory := cachedirectory.NewCacheDirectory(temporaryDirectory)
 	var githubDotComClient *github.Client
@@ -123,16 +151,16 @@ func TestPullReleases(t *testing.T) {
 	temporaryDirectory := test.CreateTemporaryDirectory(t)
 	githubTestServer, githubURL := test.GetTestHTTPServer(t)
 	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/tags/some-codeql-version-on-main", func(response http.ResponseWriter, request *http.Request) {
-		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./pull_test/api/release-some-codeql-version-on-main.json", response)
+		test.ServeHTTPResponseFromObject(t, releaseSomeCodeQLVersionOnMain, response)
 	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/assets/1", func(response http.ResponseWriter, request *http.Request) {
-		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./pull_test/api/asset-some-codeql-version-on-main.bin", response)
+		test.ServeHTTPResponseFromString(t, releaseSomeCodeQLVersionOnMainContent, response)
 	}).Methods("GET").Headers("accept", "application/octet-stream")
 	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/tags/some-codeql-version-on-v1-and-v2", func(response http.ResponseWriter, request *http.Request) {
-		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./pull_test/api/release-some-codeql-version-on-v1-and-v2.json", response)
+		test.ServeHTTPResponseFromObject(t, releaseSomeCodeQLVersionOnV1AndV2, response)
 	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/assets/2", func(response http.ResponseWriter, request *http.Request) {
-		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./pull_test/api/asset-some-codeql-version-on-v1-and-v2.bin", response)
+		test.ServeHTTPResponseFromString(t, releaseSomeCodeQLVersionOnV1AndV2Content, response)
 	}).Methods("GET").Headers("accept", "application/octet-stream")
 	pullService := getTestPullService(t, temporaryDirectory, initialActionRepository, githubURL)
 	err := pullService.pullGit(true)
@@ -140,26 +168,26 @@ func TestPullReleases(t *testing.T) {
 	err = pullService.pullReleases()
 	require.NoError(t, err)
 
-	test.RequireFilesAreEqual(t, "./pull_test/api/asset-some-codeql-version-on-main.bin", pullService.cacheDirectory.AssetPath("some-codeql-version-on-main", "codeql-bundle.tar.gz"))
-	test.RequireFilesAreEqual(t, "./pull_test/api/asset-some-codeql-version-on-v1-and-v2.bin", pullService.cacheDirectory.AssetPath("some-codeql-version-on-v1-and-v2", "codeql-bundle.tar.gz"))
+	test.RequireFileHasContent(t, releaseSomeCodeQLVersionOnMainContent, pullService.cacheDirectory.AssetPath("some-codeql-version-on-main", "codeql-bundle.tar.gz"))
+	test.RequireFileHasContent(t, releaseSomeCodeQLVersionOnV1AndV2Content, pullService.cacheDirectory.AssetPath("some-codeql-version-on-v1-and-v2", "codeql-bundle.tar.gz"))
 
 	// If we pull again, we should only download assets where the size mismatches.
 	err = ioutil.WriteFile(pullService.cacheDirectory.AssetPath("some-codeql-version-on-v1-and-v2", "codeql-bundle.tar.gz"), []byte("Some nonsense."), 0644)
 	require.NoError(t, err)
 	githubTestServer, githubURL = test.GetTestHTTPServer(t)
 	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/tags/some-codeql-version-on-main", func(response http.ResponseWriter, request *http.Request) {
-		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./pull_test/api/release-some-codeql-version-on-main.json", response)
+		test.ServeHTTPResponseFromObject(t, releaseSomeCodeQLVersionOnMain, response)
 	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/tags/some-codeql-version-on-v1-and-v2", func(response http.ResponseWriter, request *http.Request) {
-		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./pull_test/api/release-some-codeql-version-on-v1-and-v2.json", response)
+		test.ServeHTTPResponseFromObject(t, releaseSomeCodeQLVersionOnV1AndV2, response)
 	}).Methods("GET")
 	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/assets/2", func(response http.ResponseWriter, request *http.Request) {
-		test.ServeHTTPResponseFromFile(t, http.StatusOK, "./pull_test/api/asset-some-codeql-version-on-v1-and-v2.bin", response)
+		test.ServeHTTPResponseFromString(t, releaseSomeCodeQLVersionOnV1AndV2Content, response)
 	}).Methods("GET").Headers("accept", "application/octet-stream")
 	pullService = getTestPullService(t, temporaryDirectory, initialActionRepository, githubURL)
 	err = pullService.pullReleases()
 	require.NoError(t, err)
 
-	test.RequireFilesAreEqual(t, "./pull_test/api/asset-some-codeql-version-on-main.bin", pullService.cacheDirectory.AssetPath("some-codeql-version-on-main", "codeql-bundle.tar.gz"))
-	test.RequireFilesAreEqual(t, "./pull_test/api/asset-some-codeql-version-on-v1-and-v2.bin", pullService.cacheDirectory.AssetPath("some-codeql-version-on-v1-and-v2", "codeql-bundle.tar.gz"))
+	test.RequireFileHasContent(t, releaseSomeCodeQLVersionOnMainContent, pullService.cacheDirectory.AssetPath("some-codeql-version-on-main", "codeql-bundle.tar.gz"))
+	test.RequireFileHasContent(t, releaseSomeCodeQLVersionOnV1AndV2Content, pullService.cacheDirectory.AssetPath("some-codeql-version-on-v1-and-v2", "codeql-bundle.tar.gz"))
 }
