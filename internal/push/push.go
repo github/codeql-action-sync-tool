@@ -291,6 +291,10 @@ func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, des
 	if err != nil {
 		return err
 	}
+	err = cacheDirectory.CheckLock()
+	if err != nil {
+		return err
+	}
 
 	destinationURL = strings.TrimRight(destinationURL, "/")
 	tokenSource := oauth2.StaticTokenSource(

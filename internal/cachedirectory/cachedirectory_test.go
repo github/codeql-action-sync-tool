@@ -88,3 +88,14 @@ func TestCreateCacheDirectoryWithTrailingSlash(t *testing.T) {
 	err := cacheDirectory.CheckOrCreateVersionFile(true, aVersion)
 	require.NoError(t, err)
 }
+
+func TestLocking(t *testing.T) {
+	temporaryDirectory := test.CreateTemporaryDirectory(t)
+	cacheDirectory := NewCacheDirectory(path.Join(temporaryDirectory, "cache"))
+	require.NoError(t, cacheDirectory.CheckOrCreateVersionFile(true, aVersion))
+	require.NoError(t, cacheDirectory.Lock())
+	require.NoError(t, cacheDirectory.Lock())
+	require.Error(t, cacheDirectory.CheckLock())
+	require.NoError(t, cacheDirectory.Unlock())
+	require.NoError(t, cacheDirectory.CheckLock())
+}
