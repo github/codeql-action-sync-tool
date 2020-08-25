@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"regexp"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/github/codeql-action-sync/internal/actionconfiguration"
 	"github.com/mitchellh/ioprogress"
@@ -44,9 +45,9 @@ type pullService struct {
 
 func (pullService *pullService) pullGit(fresh bool) error {
 	if fresh {
-		log.Print("Pulling Git contents fresh...")
+		log.Debug("Pulling Git contents fresh...")
 	} else {
-		log.Print("Updating Git contents...")
+		log.Debug("Updating Git contents...")
 	}
 	gitPath := pullService.cacheDirectory.GitPath()
 
@@ -107,7 +108,7 @@ func (pullService *pullService) pullGit(fresh bool) error {
 }
 
 func (pullService *pullService) findRelevantReleases() ([]string, error) {
-	log.Print("Finding release references...")
+	log.Debug("Finding release references...")
 	localRepository, err := git.PlainOpen(pullService.cacheDirectory.GitPath())
 	if err != nil {
 		return []string{}, errors.Wrap(err, "Error opening Git repository cache.")
@@ -121,7 +122,7 @@ func (pullService *pullService) findRelevantReleases() ([]string, error) {
 	releases := []string{}
 	err = references.ForEach(func(reference *plumbing.Reference) error {
 		if relevantReferences.MatchString(reference.Name().String()) {
-			log.Printf("Found %s.", reference.Name().String())
+			log.Debugf("Found %s.", reference.Name().String())
 			commit, err := localRepository.CommitObject(reference.Hash())
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("Error loading commit %s for reference %s.", reference.Hash(), reference.Name().String()))
@@ -129,7 +130,7 @@ func (pullService *pullService) findRelevantReleases() ([]string, error) {
 			file, err := commit.File(defaultConfigurationPath)
 			if err != nil {
 				if err == object.ErrFileNotFound {
-					log.Printf("Ignoring reference %s as it does not have a default configuration.", reference.Name().String())
+					log.Debugf("Ignoring reference %s as it does not have a default configuration.", reference.Name().String())
 					return nil
 				}
 				return errors.Wrap(err, fmt.Sprintf("Error loading default configuration file from commit %s for reference %s.", reference.Hash(), reference.Name().String()))
@@ -156,14 +157,14 @@ func (pullService *pullService) findRelevantReleases() ([]string, error) {
 }
 
 func (pullService *pullService) pullReleases() error {
-	log.Print("Pulling CodeQL bundles...")
+	log.Debug("Pulling CodeQL bundles...")
 	relevantReleases, err := pullService.findRelevantReleases()
 	if err != nil {
 		return err
 	}
 
 	for index, releaseTag := range relevantReleases {
-		log.Printf("Pulling CodeQL bundle %s (%d/%d)...", releaseTag, index+1, len(relevantReleases))
+		log.Debugf("Pulling CodeQL bundle %s (%d/%d)...", releaseTag, index+1, len(relevantReleases))
 		release, _, err := pullService.githubDotComClient.Repositories.GetReleaseByTag(pullService.ctx, sourceOwner, sourceRepository, releaseTag)
 		if err != nil {
 			return errors.Wrap(err, "Error loading CodeQL release information.")
@@ -187,11 +188,11 @@ func (pullService *pullService) pullReleases() error {
 			return errors.Wrap(err, "Error creating assets directory.")
 		}
 		for _, asset := range release.Assets {
-			log.Printf("Downloading asset %s...", asset.GetName())
+			log.Debugf("Downloading asset %s...", asset.GetName())
 			downloadPath := pullService.cacheDirectory.AssetPath(releaseTag, asset.GetName())
 			downloadPathStat, err := os.Stat(downloadPath)
 			if err == nil && downloadPathStat.Size() == int64(asset.GetSize()) {
-				log.Println("Asset is already in cache.")
+				log.Debug("Asset is already in cache.")
 				continue
 			}
 			err = os.RemoveAll(downloadPath)
@@ -275,6 +276,6 @@ func Pull(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, sou
 	if err != nil {
 		return err
 	}
-	log.Print("Finished pulling the CodeQL Action repository and bundles!")
+	log.Info("Finished pulling the CodeQL Action repository and bundles!")
 	return nil
 }
