@@ -13,7 +13,7 @@ var pushCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		version.LogVersion()
 		cacheDirectory := cachedirectory.NewCacheDirectory(rootFlags.cacheDir)
-		return push.Push(cmd.Context(), cacheDirectory, pushFlags.destinationURL, pushFlags.destinationToken, pushFlags.destinationRepository)
+		return push.Push(cmd.Context(), cacheDirectory, pushFlags.destinationURL, pushFlags.destinationToken, pushFlags.destinationRepository, pushFlags.force)
 	},
 }
 
@@ -21,6 +21,7 @@ type pushFlagFields struct {
 	destinationURL        string
 	destinationToken      string
 	destinationRepository string
+	force                 bool
 }
 
 var pushFlags = pushFlagFields{}
@@ -31,4 +32,5 @@ func (f *pushFlagFields) Init(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&f.destinationToken, "destination-token", "", "A token to access the API on the GitHub Enterprise instance.")
 	cmd.MarkFlagRequired("destination-token")
 	cmd.Flags().StringVar(&f.destinationRepository, "destination-repository", "github/codeql-action", "The name of the repository to create on GitHub Enterprise.")
+	cmd.Flags().BoolVar(&f.force, "force", false, "Replace the existing repository even if it was not created by the sync tool.")
 }

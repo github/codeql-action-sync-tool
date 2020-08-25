@@ -26,6 +26,7 @@ From a machine with access to both GitHub.com and GitHub Enterprise Server use t
 * `--cache-dir` - A temporary directory in which to store data downloaded from GitHub.com before it is uploaded to GitHub Enterprise Server. If not specified a directory next to the sync tool will be used.
 * `--source-token` - A token to access the API of GitHub.com. This is normally not required, but can be provided if you have issues with API rate limiting. If provided, it should have the `public_repo` scope.
 * `--destination-repository` - The name of the repository in which to create or update the CodeQL Action. If not specified `github/codeql-action` will be used.
+* `--force` - By default the tool will not overwrite existing repositories. Providing this flag will allow it to.
 
 ### I don't have a machine that can access both GitHub.com and GitHub Enterprise Server.
 From a machine with access to GitHub.com use the `./codeql-action-sync pull` command to download a copy of the CodeQL Action and bundles to a local folder.
@@ -45,6 +46,7 @@ Now use the `./codeql-action-sync push` command to upload the CodeQL Action and 
 **Optional Arguments:**
 * `--cache-dir` - The directory to which the Action was previously downloaded.
 * `--destination-repository` - The name of the repository in which to create or update the CodeQL Action. If not specified `github/codeql-action` will be used.
+* `--force` - By default the tool will not overwrite existing repositories. Providing this flag will allow it to.
 
 ## Contributing
 For more details on contributing improvements to this tool, see our [contributor guide](CONTRIBUTING.md).

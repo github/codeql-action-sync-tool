@@ -18,7 +18,7 @@ var syncCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		err = push.Push(cmd.Context(), cacheDirectory, pushFlags.destinationURL, pushFlags.destinationToken, pushFlags.destinationRepository)
+		err = push.Push(cmd.Context(), cacheDirectory, pushFlags.destinationURL, pushFlags.destinationToken, pushFlags.destinationRepository, pushFlags.force)
 		if err != nil {
 			return err
 		}

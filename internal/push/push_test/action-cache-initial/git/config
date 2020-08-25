@@ -2,6 +2,3 @@
 	repositoryformatversion = 0
 	filemode = true
 	bare = true
-[remote "enterprise"]
-	url = /tmp/codeql-action-sync-tests128816160/target
-	fetch = +refs/heads/*:refs/remotes/enterprise/*

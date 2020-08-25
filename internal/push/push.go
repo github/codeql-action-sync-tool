@@ -28,6 +28,8 @@ import (
 const remoteName = "enterprise"
 const repositoryHomepage = "https://github.com/github/codeql-action-sync-tool/"
 
+const errorAlreadyExists = "The destination repository already exists, but it was not created with the CodeQL Action sync tool. If you are sure you want to push the CodeQL Action to it, re-run this command with the `--force` flag."
+
 type pushService struct {
 	ctx                        context.Context
 	cacheDirectory             cachedirectory.CacheDirectory
@@ -35,6 +37,7 @@ type pushService struct {
 	destinationRepositoryName  string
 	destinationRepositoryOwner string
 	destinationToken           string
+	force                      bool
 }
 
 func (pushService *pushService) createRepository() (*github.Repository, error) {
@@ -75,6 +78,9 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 	repository, response, err := pushService.githubEnterpriseClient.Repositories.Get(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName)
 	if err != nil && (response == nil || response.StatusCode != http.StatusNotFound) {
 		return nil, errors.Wrap(err, "Error checking if destination repository exists.")
+	}
+	if response.StatusCode != http.StatusNotFound && repositoryHomepage != repository.GetHomepage() && !pushService.force {
+		return nil, errors.Errorf(errorAlreadyExists)
 	}
 	desiredRepositoryProperties := github.Repository{
 		Name:         github.String(pushService.destinationRepositoryName),
@@ -286,7 +292,7 @@ func (pushService *pushService) pushReleases() error {
 	return nil
 }
 
-func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, destinationURL string, destinationToken string, destinationRepository string) error {
+func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, destinationURL string, destinationToken string, destinationRepository string, force bool) error {
 	err := cacheDirectory.CheckOrCreateVersionFile(false, version.Version())
 	if err != nil {
 		return err
@@ -317,6 +323,7 @@ func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, des
 		destinationRepositoryOwner: destinationRepositoryOwner,
 		destinationRepositoryName:  destinationRepositoryName,
 		destinationToken:           destinationToken,
+		force:                      force,
 	}
 
 	repository, err := pushService.createRepository()
