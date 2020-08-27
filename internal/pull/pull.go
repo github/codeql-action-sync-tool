@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 
@@ -89,6 +90,35 @@ func (pullService *pullService) pullGit(fresh bool) error {
 			Password: pullService.sourceToken,
 		}
 	}
+
+	remote, err := localRepository.Remote(git.DefaultRemoteName)
+	if err != nil {
+		return errors.Wrap(err, "Error getting remote.")
+	}
+	remoteReferences, err := remote.List(&git.ListOptions{Auth: credentials})
+	if err != nil {
+		return errors.Wrap(err, "Error listing remote references.")
+	}
+	localReferences, err := localRepository.References()
+	if err != nil {
+		return errors.Wrap(err, "Error listing local references.")
+	}
+	localReferences.ForEach(func(localReference *plumbing.Reference) error {
+		if !strings.HasPrefix(localReference.Name().String(), "refs/") {
+			return nil
+		}
+		for _, remoteReference := range remoteReferences {
+			remoteReferenceName := strings.TrimPrefix(remoteReference.Name().String(), "refs/")
+			if cachedirectory.CacheReferencePrefix+remoteReferenceName == localReference.Name().String() {
+				return nil
+			}
+		}
+		err := localRepository.Storer.RemoveReference(localReference.Name())
+		if err != nil {
+			return errors.Wrap(err, "Error pruning reference.")
+		}
+		return nil
+	})
 
 	err = localRepository.FetchContext(pullService.ctx, &git.FetchOptions{
 		RemoteName: git.DefaultRemoteName,

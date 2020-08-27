@@ -94,6 +94,7 @@ func TestPullGitFresh(t *testing.T) {
 		// It is expected that we still pull these even though they don't match the expected pattern. We just ignore them later on.
 		"bd82b85707bc13904e3526517677039d4da4a9bb refs/remotes/origin/heads/very-ignored-branch",
 		"bd82b85707bc13904e3526517677039d4da4a9bb refs/remotes/origin/tags/an-ignored-tag-too",
+		"26936381e619a01122ea33993e3cebc474496805 refs/remotes/origin/heads/a-ref-that-will-need-pruning",
 	})
 }
 
@@ -125,11 +126,9 @@ func TestPullGitNotFreshWithChanges(t *testing.T) {
 		"b9f01aa2c50f49898d4c7845a66be8824499fe9d refs/remotes/origin/heads/main",
 		"26936381e619a01122ea33993e3cebc474496805 refs/remotes/origin/heads/v1",
 		"33d42021633d74bcd0bf9c95e3d3159131a5faa7 refs/remotes/origin/heads/v3", // v3 was force-pushed, and should have been force-pulled too.
-		"26936381e619a01122ea33993e3cebc474496805 refs/remotes/origin/tags/v2",
 		"42d077b4730d1ba413f7bb7e0fa7c98653fb0c78 refs/remotes/origin/heads/v4", // v4 is a new branch.
-		// We deleted these, but we don't currently do any pruning.
-		"bd82b85707bc13904e3526517677039d4da4a9bb refs/remotes/origin/heads/very-ignored-branch",
 		"bd82b85707bc13904e3526517677039d4da4a9bb refs/remotes/origin/tags/an-ignored-tag-too",
+		"26936381e619a01122ea33993e3cebc474496805 refs/remotes/origin/heads/a-ref-that-will-need-pruning/because-it-now-has-this-extra-bit",
 	})
 }
 
