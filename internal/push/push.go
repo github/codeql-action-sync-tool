@@ -133,7 +133,7 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 	}
 
 	_ = gitRepository.DeleteRemote(remoteName)
-	gitRemote, err := gitRepository.CreateRemote(&config.RemoteConfig{
+	_, err = gitRepository.CreateRemote(&config.RemoteConfig{
 		Name: remoteName,
 		URLs: []string{remoteURL},
 	})
@@ -169,7 +169,7 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 		}
 	}
 	for _, refSpecs := range refSpecBatches {
-		err = gitRemote.PushContext(pushService.ctx, &git.PushOptions{
+		err = gitRepository.PushContext(pushService.ctx, &git.PushOptions{
 			RemoteName: remoteName,
 			RefSpecs:   refSpecs,
 			Auth:       credentials,
