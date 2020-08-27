@@ -150,6 +150,35 @@ func TestPushGit(t *testing.T) {
 		"bd82b85707bc13904e3526517677039d4da4a9bb refs/heads/very-ignored-branch",
 		"bd82b85707bc13904e3526517677039d4da4a9bb refs/tags/an-ignored-tag-too",
 		"26936381e619a01122ea33993e3cebc474496805 refs/tags/v2",
+		"26936381e619a01122ea33993e3cebc474496805 refs/heads/a-ref-that-will-need-pruning",
+	})
+
+	pushService = getTestPushService(t, "./push_test/action-cache-modified/", "")
+	err = pushService.pushGit(&repository, true)
+	require.NoError(t, err)
+	test.CheckExpectedReferencesInRepository(t, destinationPath, []string{
+		"26936381e619a01122ea33993e3cebc474496805 refs/tags/codeql-bundle-20200101",
+		"26936381e619a01122ea33993e3cebc474496805 refs/tags/codeql-bundle-20200630",
+		"b9f01aa2c50f49898d4c7845a66be8824499fe9d refs/heads/main",
+		"26936381e619a01122ea33993e3cebc474496805 refs/heads/v1",
+		"e529a54fad10a936308b2220e05f7f00757f8e7c refs/heads/v3",
+		"bd82b85707bc13904e3526517677039d4da4a9bb refs/heads/very-ignored-branch",
+		"bd82b85707bc13904e3526517677039d4da4a9bb refs/tags/an-ignored-tag-too",
+		"26936381e619a01122ea33993e3cebc474496805 refs/tags/v2",
+	})
+
+	err = pushService.pushGit(&repository, false)
+	require.NoError(t, err)
+	test.CheckExpectedReferencesInRepository(t, destinationPath, []string{
+		"26936381e619a01122ea33993e3cebc474496805 refs/tags/codeql-bundle-20200101",
+		"26936381e619a01122ea33993e3cebc474496805 refs/tags/codeql-bundle-20200630",
+		"b9f01aa2c50f49898d4c7845a66be8824499fe9d refs/heads/main",
+		"26936381e619a01122ea33993e3cebc474496805 refs/heads/v1",
+		"e529a54fad10a936308b2220e05f7f00757f8e7c refs/heads/v3",
+		"bd82b85707bc13904e3526517677039d4da4a9bb refs/heads/very-ignored-branch",
+		"bd82b85707bc13904e3526517677039d4da4a9bb refs/tags/an-ignored-tag-too",
+		"26936381e619a01122ea33993e3cebc474496805 refs/tags/v2",
+		"26936381e619a01122ea33993e3cebc474496805 refs/heads/a-ref-that-will-need-pruning/because-it-now-has-this-extra-bit",
 	})
 }
 
