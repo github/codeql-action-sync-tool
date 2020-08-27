@@ -1,4 +1,5 @@
 # pack-refs with: peeled fully-peeled sorted 
+26936381e619a01122ea33993e3cebc474496805 refs/heads/a-ref-that-will-need-pruning
 b9f01aa2c50f49898d4c7845a66be8824499fe9d refs/heads/main
 26936381e619a01122ea33993e3cebc474496805 refs/heads/v1
 e529a54fad10a936308b2220e05f7f00757f8e7c refs/heads/v3
