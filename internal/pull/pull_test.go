@@ -87,14 +87,14 @@ func TestPullGitFresh(t *testing.T) {
 	err := pullService.pullGit(true)
 	require.NoError(t, err)
 	test.CheckExpectedReferencesInRepository(t, pullService.cacheDirectory.GitPath(), []string{
-		"b9f01aa2c50f49898d4c7845a66be8824499fe9d refs/remotes/origin/heads/main",
-		"26936381e619a01122ea33993e3cebc474496805 refs/remotes/origin/heads/v1",
-		"e529a54fad10a936308b2220e05f7f00757f8e7c refs/remotes/origin/heads/v3",
-		"26936381e619a01122ea33993e3cebc474496805 refs/remotes/origin/tags/v2",
+		"b9f01aa2c50f49898d4c7845a66be8824499fe9d refs/heads/main",
+		"26936381e619a01122ea33993e3cebc474496805 refs/heads/v1",
+		"e529a54fad10a936308b2220e05f7f00757f8e7c refs/heads/v3",
+		"26936381e619a01122ea33993e3cebc474496805 refs/tags/v2",
 		// It is expected that we still pull these even though they don't match the expected pattern. We just ignore them later on.
-		"bd82b85707bc13904e3526517677039d4da4a9bb refs/remotes/origin/heads/very-ignored-branch",
-		"bd82b85707bc13904e3526517677039d4da4a9bb refs/remotes/origin/tags/an-ignored-tag-too",
-		"26936381e619a01122ea33993e3cebc474496805 refs/remotes/origin/heads/a-ref-that-will-need-pruning",
+		"bd82b85707bc13904e3526517677039d4da4a9bb refs/heads/very-ignored-branch",
+		"bd82b85707bc13904e3526517677039d4da4a9bb refs/tags/an-ignored-tag-too",
+		"26936381e619a01122ea33993e3cebc474496805 refs/heads/a-ref-that-will-need-pruning",
 	})
 }
 
@@ -123,12 +123,12 @@ func TestPullGitNotFreshWithChanges(t *testing.T) {
 	err = pullService.pullGit(false)
 	require.NoError(t, err)
 	test.CheckExpectedReferencesInRepository(t, pullService.cacheDirectory.GitPath(), []string{
-		"b9f01aa2c50f49898d4c7845a66be8824499fe9d refs/remotes/origin/heads/main",
-		"26936381e619a01122ea33993e3cebc474496805 refs/remotes/origin/heads/v1",
-		"33d42021633d74bcd0bf9c95e3d3159131a5faa7 refs/remotes/origin/heads/v3", // v3 was force-pushed, and should have been force-pulled too.
-		"42d077b4730d1ba413f7bb7e0fa7c98653fb0c78 refs/remotes/origin/heads/v4", // v4 is a new branch.
-		"bd82b85707bc13904e3526517677039d4da4a9bb refs/remotes/origin/tags/an-ignored-tag-too",
-		"26936381e619a01122ea33993e3cebc474496805 refs/remotes/origin/heads/a-ref-that-will-need-pruning/because-it-now-has-this-extra-bit",
+		"b9f01aa2c50f49898d4c7845a66be8824499fe9d refs/heads/main",
+		"26936381e619a01122ea33993e3cebc474496805 refs/heads/v1",
+		"33d42021633d74bcd0bf9c95e3d3159131a5faa7 refs/heads/v3", // v3 was force-pushed, and should have been force-pulled too.
+		"42d077b4730d1ba413f7bb7e0fa7c98653fb0c78 refs/heads/v4", // v4 is a new branch.
+		"bd82b85707bc13904e3526517677039d4da4a9bb refs/tags/an-ignored-tag-too",
+		"26936381e619a01122ea33993e3cebc474496805 refs/heads/a-ref-that-will-need-pruning/because-it-now-has-this-extra-bit",
 	})
 }
 

@@ -1,9 +1,9 @@
 # pack-refs with: peeled fully-peeled sorted 
-b9f01aa2c50f49898d4c7845a66be8824499fe9d refs/remotes/origin/heads/main
-26936381e619a01122ea33993e3cebc474496805 refs/remotes/origin/heads/v1
-e529a54fad10a936308b2220e05f7f00757f8e7c refs/remotes/origin/heads/v3
-bd82b85707bc13904e3526517677039d4da4a9bb refs/remotes/origin/heads/very-ignored-branch
-bd82b85707bc13904e3526517677039d4da4a9bb refs/remotes/origin/tags/an-ignored-tag-too
-26936381e619a01122ea33993e3cebc474496805 refs/remotes/origin/tags/codeql-bundle-20200101
-26936381e619a01122ea33993e3cebc474496805 refs/remotes/origin/tags/codeql-bundle-20200630
-26936381e619a01122ea33993e3cebc474496805 refs/remotes/origin/tags/v2
+b9f01aa2c50f49898d4c7845a66be8824499fe9d refs/heads/main
+26936381e619a01122ea33993e3cebc474496805 refs/heads/v1
+e529a54fad10a936308b2220e05f7f00757f8e7c refs/heads/v3
+bd82b85707bc13904e3526517677039d4da4a9bb refs/heads/very-ignored-branch
+bd82b85707bc13904e3526517677039d4da4a9bb refs/tags/an-ignored-tag-too
+26936381e619a01122ea33993e3cebc474496805 refs/tags/codeql-bundle-20200101
+26936381e619a01122ea33993e3cebc474496805 refs/tags/codeql-bundle-20200630
+26936381e619a01122ea33993e3cebc474496805 refs/tags/v2

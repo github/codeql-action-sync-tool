@@ -8,7 +8,6 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/go-git/go-git/v5"
 	"github.com/pkg/errors"
 )
 
@@ -17,8 +16,6 @@ const errorNotACacheOrEmpty = "The cache directory you have selected is not empt
 const errorCacheParentDoesNotExist = "Cannot create cache directory because its parent, does not exist."
 const errorPushNonCache = "The cache directory you have provided does not appear to be valid. Please check it exists and that you have run the `pull` command to populate it."
 const errorCacheLocked = "The cache directory is locked, likely due to a `pull` command being interrupted. Please run `pull` again to ensure all required data is downloaded."
-
-const CacheReferencePrefix = "refs/remotes/" + git.DefaultRemoteName + "/"
 
 type CacheDirectory struct {
 	path string
