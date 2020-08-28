@@ -51,7 +51,7 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 	log.Debug("Ensuring repository exists...")
 	user, response, err := pushService.githubEnterpriseClient.Users.Get(pushService.ctx, "")
 	if err != nil {
-		if response.StatusCode == http.StatusUnauthorized {
+		if response != nil && response.StatusCode == http.StatusUnauthorized {
 			return nil, usererrors.New(errorInvalidDestinationToken)
 		}
 		return nil, errors.Wrap(err, "Error getting current user.")
@@ -68,14 +68,14 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 		if err != nil && (response == nil || response.StatusCode != http.StatusNotFound) {
 			return nil, errors.Wrap(err, "Error checking if destination organization exists.")
 		}
-		if response.StatusCode == http.StatusNotFound {
+		if response != nil && response.StatusCode == http.StatusNotFound {
 			log.Debugf("The organization %s does not exist. Creating it...", pushService.destinationRepositoryOwner)
 			_, _, err := pushService.githubEnterpriseClient.Admin.CreateOrg(pushService.ctx, &github.Organization{
 				Login: github.String(pushService.destinationRepositoryOwner),
 				Name:  github.String(pushService.destinationRepositoryOwner),
 			}, user.GetLogin())
 			if err != nil {
-				if response.StatusCode == http.StatusNotFound && githubapiutil.MissingAllScopes(response, "site_admin") {
+				if response != nil && response.StatusCode == http.StatusNotFound && githubapiutil.MissingAllScopes(response, "site_admin") {
 					return nil, usererrors.New("The destination token you have provided does not have the `site_admin` scope, so the destination organization cannot be created.")
 				}
 				return nil, errors.Wrap(err, "Error creating organization.")
