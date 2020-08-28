@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/go-git/go-git/v5/plumbing"
+
 	"github.com/github/codeql-action-sync/internal/githubapiutil"
 
 	log "github.com/sirupsen/logrus"
@@ -22,6 +24,7 @@ import (
 	"github.com/github/codeql-action-sync/internal/version"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/google/go-github/v32/github"
 	"github.com/mitchellh/ioprogress"
@@ -142,35 +145,53 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 	}
 
 	refSpecBatches := [][]config.RefSpec{}
+	remoteReferences, err := remote.List(&git.ListOptions{Auth: credentials})
+	if err != nil && err != transport.ErrEmptyRemoteRepository {
+		return errors.Wrap(err, "Error listing remote references.")
+	}
+	deleteRefSpecs := []config.RefSpec{}
+	for _, remoteReference := range remoteReferences {
+		_, err := gitRepository.Reference(remoteReference.Name(), false)
+		if err != nil && err != plumbing.ErrReferenceNotFound {
+			return errors.Wrapf(err, "Error finding local reference %s.", remoteReference.Name())
+		}
+		if err == plumbing.ErrReferenceNotFound {
+			deleteRefSpecs = append(deleteRefSpecs, config.RefSpec(":"+remoteReference.Name().String()))
+		}
+	}
+	refSpecBatches = append(refSpecBatches, deleteRefSpecs)
+
 	if initialPush {
 		releasePathStats, err := ioutil.ReadDir(pushService.cacheDirectory.ReleasesPath())
 		if err != nil {
 			return errors.Wrap(err, "Error reading releases.")
 		}
-		refSpecBatches = append(refSpecBatches, []config.RefSpec{})
+		initialRefSpecs := []config.RefSpec{}
 		for _, releasePathStat := range releasePathStats {
-			refSpecBatches[0] = append(refSpecBatches[0], config.RefSpec("+refs/tags/"+releasePathStat.Name()+":refs/tags/"+releasePathStat.Name()))
+			initialRefSpecs = append(initialRefSpecs, config.RefSpec("+refs/tags/"+releasePathStat.Name()+":refs/tags/"+releasePathStat.Name()))
 		}
+		refSpecBatches = append(refSpecBatches, initialRefSpecs)
 	} else {
 		// We've got to push `main` on its own, so that it will be made the default branch if the repository has just been created. We then push everything else afterwards.
-		refSpecBatches = [][]config.RefSpec{
+		refSpecBatches = append(refSpecBatches,
 			[]config.RefSpec{
 				config.RefSpec("+refs/heads/main:refs/heads/main"),
 			},
 			[]config.RefSpec{
 				config.RefSpec("+refs/*:refs/*"),
 			},
-		}
+		)
 	}
 	for _, refSpecs := range refSpecBatches {
-		err = remote.PushContext(pushService.ctx, &git.PushOptions{
-			RefSpecs: refSpecs,
-			Auth:     credentials,
-			Progress: os.Stderr,
-			Force:    true,
-		})
-		if err != nil && errors.Cause(err) != git.NoErrAlreadyUpToDate {
-			return errors.Wrap(err, "Error pushing Action to GitHub Enterprise Server.")
+		if len(refSpecs) != 0 {
+			err = remote.PushContext(pushService.ctx, &git.PushOptions{
+				RefSpecs: refSpecs,
+				Auth:     credentials,
+				Progress: os.Stderr,
+			})
+			if err != nil && errors.Cause(err) != git.NoErrAlreadyUpToDate {
+				return errors.Wrap(err, "Error pushing Action to GitHub Enterprise Server.")
+			}
 		}
 	}
 
