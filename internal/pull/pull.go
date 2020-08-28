@@ -3,7 +3,6 @@ package pull
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -147,7 +146,7 @@ func (pullService *pullService) findRelevantReleases() ([]string, error) {
 			log.Debugf("Found %s.", reference.Name().String())
 			commit, err := localRepository.CommitObject(reference.Hash())
 			if err != nil {
-				return errors.Wrap(err, fmt.Sprintf("Error loading commit %s for reference %s.", reference.Hash(), reference.Name().String()))
+				return errors.Wrapf(err, "Error loading commit %s for reference %s.", reference.Hash(), reference.Name().String())
 			}
 			file, err := commit.File(defaultConfigurationPath)
 			if err != nil {
@@ -155,11 +154,11 @@ func (pullService *pullService) findRelevantReleases() ([]string, error) {
 					log.Debugf("Ignoring reference %s as it does not have a default configuration.", reference.Name().String())
 					return nil
 				}
-				return errors.Wrap(err, fmt.Sprintf("Error loading default configuration file from commit %s for reference %s.", reference.Hash(), reference.Name().String()))
+				return errors.Wrapf(err, "Error loading default configuration file from commit %s for reference %s.", reference.Hash(), reference.Name().String())
 			}
 			content, err := file.Contents()
 			if err != nil {
-				return errors.Wrap(err, fmt.Sprintf("Error reading default configuration file content from commit %s for reference %s.", reference.Hash(), reference.Name().String()))
+				return errors.Wrapf(err, "Error reading default configuration file content from commit %s for reference %s.", reference.Hash(), reference.Name().String())
 			}
 			configuration, err := actionconfiguration.Parse(content)
 			if err != nil {
