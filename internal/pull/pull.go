@@ -32,7 +32,7 @@ const sourceOwner = "github"
 const sourceRepository = "codeql-action"
 const sourceURL = "https://github.com/" + sourceOwner + "/" + sourceRepository + ".git"
 
-var relevantReferences = regexp.MustCompile("^refs/remotes/" + git.DefaultRemoteName + "/(heads|tags)/(main|v\\d+)$")
+var relevantReferences = regexp.MustCompile("^refs/(heads|tags)/(main|v\\d+)$")
 
 const defaultConfigurationPath = "src/defaults.json"
 
@@ -75,13 +75,10 @@ func (pullService *pullService) pullGit(fresh bool) error {
 		return errors.Wrap(err, "Error removing existing Git remote.")
 	}
 
-	_, err = localRepository.CreateRemote(&config.RemoteConfig{
+	remote := git.NewRemote(localRepository.Storer, &config.RemoteConfig{
 		Name: git.DefaultRemoteName,
 		URLs: []string{pullService.gitCloneURL},
 	})
-	if err != nil {
-		return errors.Wrap(err, "Error setting Git remote.")
-	}
 
 	var credentials *githttp.BasicAuth
 	if pullService.sourceToken != "" {
@@ -91,10 +88,6 @@ func (pullService *pullService) pullGit(fresh bool) error {
 		}
 	}
 
-	remote, err := localRepository.Remote(git.DefaultRemoteName)
-	if err != nil {
-		return errors.Wrap(err, "Error getting remote.")
-	}
 	remoteReferences, err := remote.List(&git.ListOptions{Auth: credentials})
 	if err != nil {
 		return errors.Wrap(err, "Error listing remote references.")
@@ -108,8 +101,7 @@ func (pullService *pullService) pullGit(fresh bool) error {
 			return nil
 		}
 		for _, remoteReference := range remoteReferences {
-			remoteReferenceName := strings.TrimPrefix(remoteReference.Name().String(), "refs/")
-			if cachedirectory.CacheReferencePrefix+remoteReferenceName == localReference.Name().String() {
+			if remoteReference.Name().String() == localReference.Name().String() {
 				return nil
 			}
 		}
@@ -120,11 +112,11 @@ func (pullService *pullService) pullGit(fresh bool) error {
 		return nil
 	})
 
-	err = localRepository.FetchContext(pullService.ctx, &git.FetchOptions{
+	err = remote.FetchContext(pullService.ctx, &git.FetchOptions{
 		RemoteName: git.DefaultRemoteName,
 		RefSpecs: []config.RefSpec{
-			config.RefSpec("+refs/heads/*:" + cachedirectory.CacheReferencePrefix + "heads/*"),
-			config.RefSpec("+refs/tags/*:" + cachedirectory.CacheReferencePrefix + "tags/*"),
+			config.RefSpec("+refs/heads/*:refs/heads/*"),
+			config.RefSpec("+refs/tags/*:refs/tags/*"),
 		},
 		Progress: os.Stderr,
 		Tags:     git.NoTags,

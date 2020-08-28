@@ -29,7 +29,6 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const remoteName = "enterprise"
 const repositoryHomepage = "https://github.com/github/codeql-action-sync-tool/"
 
 const errorAlreadyExists = "The destination repository already exists, but it was not created with the CodeQL Action sync tool. If you are sure you want to push the CodeQL Action to it, re-run this command with the `--force` flag."
@@ -132,14 +131,10 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 		return errors.Wrap(err, "Error reading Git repository from cache.")
 	}
 
-	_ = gitRepository.DeleteRemote(remoteName)
-	_, err = gitRepository.CreateRemote(&config.RemoteConfig{
-		Name: remoteName,
+	remote := git.NewRemote(gitRepository.Storer, &config.RemoteConfig{
+		Name: git.DefaultRemoteName,
 		URLs: []string{remoteURL},
 	})
-	if err != nil {
-		return errors.Wrap(err, "Error adding repository remote.")
-	}
 
 	credentials := &githttp.BasicAuth{
 		Username: "x-access-token",
@@ -154,37 +149,31 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 		}
 		refSpecBatches = append(refSpecBatches, []config.RefSpec{})
 		for _, releasePathStat := range releasePathStats {
-			refSpecBatches[0] = append(refSpecBatches[0], config.RefSpec("+"+cachedirectory.CacheReferencePrefix+"tags/"+releasePathStat.Name()+":refs/tags/"+releasePathStat.Name()))
+			refSpecBatches[0] = append(refSpecBatches[0], config.RefSpec("+refs/tags/"+releasePathStat.Name()+":refs/tags/"+releasePathStat.Name()))
 		}
 	} else {
 		// We've got to push `main` on its own, so that it will be made the default branch if the repository has just been created. We then push everything else afterwards.
 		refSpecBatches = [][]config.RefSpec{
 			[]config.RefSpec{
-				config.RefSpec("+" + cachedirectory.CacheReferencePrefix + "heads/main:refs/heads/main"),
+				config.RefSpec("+refs/heads/main:refs/heads/main"),
 			},
 			[]config.RefSpec{
-				config.RefSpec("+" + cachedirectory.CacheReferencePrefix + "heads/*:refs/heads/*"),
-				config.RefSpec("+" + cachedirectory.CacheReferencePrefix + "tags/*:refs/tags/*"),
+				config.RefSpec("+refs/*:refs/*"),
 			},
 		}
 	}
 	for _, refSpecs := range refSpecBatches {
-		err = gitRepository.PushContext(pushService.ctx, &git.PushOptions{
-			RemoteName: remoteName,
-			RefSpecs:   refSpecs,
-			Auth:       credentials,
-			Progress:   os.Stderr,
-			Force:      true,
+		err = remote.PushContext(pushService.ctx, &git.PushOptions{
+			RefSpecs: refSpecs,
+			Auth:     credentials,
+			Progress: os.Stderr,
+			Force:    true,
 		})
 		if err != nil && errors.Cause(err) != git.NoErrAlreadyUpToDate {
 			return errors.Wrap(err, "Error pushing Action to GitHub Enterprise Server.")
 		}
 	}
 
-	err = gitRepository.DeleteRemote(remoteName)
-	if err != nil {
-		return errors.Wrap(err, "Error removing repository remote.")
-	}
 	return nil
 }
 
