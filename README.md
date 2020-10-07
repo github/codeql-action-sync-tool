@@ -27,6 +27,7 @@ From a machine with access to both GitHub.com and GitHub Enterprise Server use t
 * `--source-token` - A token to access the API of GitHub.com. This is normally not required, but can be provided if you have issues with API rate limiting. The token does not need to have any scopes.
 * `--destination-repository` - The name of the repository in which to create or update the CodeQL Action. If not specified `github/codeql-action` will be used.
 * `--force` - By default the tool will not overwrite existing repositories. Providing this flag will allow it to.
+* `--push-ssh` - Push Git contents over SSH rather than HTTPS. To use this option you must have SSH access to your GitHub Enterprise instance configured.
 
 ### I don't have a machine that can access both GitHub.com and GitHub Enterprise Server.
 From a machine with access to GitHub.com use the `./codeql-action-sync pull` command to download a copy of the CodeQL Action and bundles to a local folder.
@@ -47,6 +48,7 @@ Now use the `./codeql-action-sync push` command to upload the CodeQL Action and 
 * `--cache-dir` - The directory to which the Action was previously downloaded.
 * `--destination-repository` - The name of the repository in which to create or update the CodeQL Action. If not specified `github/codeql-action` will be used.
 * `--force` - By default the tool will not overwrite existing repositories. Providing this flag will allow it to.
+* `--push-ssh` - Push Git contents over SSH rather than HTTPS. To use this option you must have SSH access to your GitHub Enterprise instance configured.
 
 ## Contributing
 For more details on contributing improvements to this tool, see our [contributor guide](CONTRIBUTING.md).

@@ -45,6 +45,7 @@ type pushService struct {
 	destinationRepositoryOwner string
 	destinationToken           string
 	force                      bool
+	pushSSH                    bool
 }
 
 func (pushService *pushService) createRepository() (*github.Repository, error) {
@@ -124,6 +125,9 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 
 func (pushService *pushService) pushGit(repository *github.Repository, initialPush bool) error {
 	remoteURL := repository.GetCloneURL()
+	if pushService.pushSSH {
+		remoteURL = repository.GetSSHURL()
+	}
 	if initialPush {
 		log.Debugf("Pushing Git releases to %s...", remoteURL)
 	} else {
@@ -142,6 +146,10 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 	credentials := &githttp.BasicAuth{
 		Username: "x-access-token",
 		Password: pushService.destinationToken,
+	}
+	if pushService.pushSSH {
+		// Use the SSH key from the environment.
+		credentials = nil
 	}
 
 	refSpecBatches := [][]config.RefSpec{}
@@ -319,7 +327,7 @@ func (pushService *pushService) pushReleases() error {
 	return nil
 }
 
-func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, destinationURL string, destinationToken string, destinationRepository string, force bool) error {
+func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, destinationURL string, destinationToken string, destinationRepository string, force bool, pushSSH bool) error {
 	err := cacheDirectory.CheckOrCreateVersionFile(false, version.Version())
 	if err != nil {
 		return err
@@ -351,6 +359,7 @@ func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, des
 		destinationRepositoryName:  destinationRepositoryName,
 		destinationToken:           destinationToken,
 		force:                      force,
+		pushSSH:                    pushSSH,
 	}
 
 	repository, err := pushService.createRepository()
