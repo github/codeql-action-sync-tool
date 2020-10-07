@@ -36,7 +36,8 @@ func (f *rootFlagFields) Init(cmd *cobra.Command) error {
 	cmd.PersistentFlags().StringVar(&f.cacheDir, "cache-dir", defaultCacheDir, "The path to a local directory to cache the Action in.")
 
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		cmd.PrintErr(err)
+		cmd.PrintErrln(err)
+		cmd.PrintErrln()
 		cmd.PrintErr(cmd.UsageString())
 		return SilentErr
 	})
