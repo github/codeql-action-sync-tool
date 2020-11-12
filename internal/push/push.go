@@ -111,10 +111,29 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 			return nil, errors.Wrap(err, "Error creating destination repository.")
 		}
 	} else {
+		if githubapiutil.HasAnyScope(response, "site_admin") {
+			impersonationToken, _, err := pushService.githubEnterpriseClient.Admin.CreateUserImpersonation(pushService.ctx, "actions-admin", &github.ImpersonateUserOptions{Scopes: []string{"repo"}})
+			if err != nil {
+				return nil, errors.Wrap(err, "Failed to impersonate Actions admin user.")
+			}
+			tokenSource := oauth2.StaticTokenSource(
+				&oauth2.Token{AccessToken: impersonationToken.GetToken()},
+			)
+			tokenClient := oauth2.NewClient(pushService.ctx, tokenSource)
+			pushService.destinationToken = impersonationToken.GetToken()
+			pushService.githubEnterpriseClient, err = github.NewEnterpriseClient(pushService.githubEnterpriseClient.BaseURL.String(), pushService.githubEnterpriseClient.UploadURL.String(), tokenClient)
+			if err != nil {
+				return nil, errors.Wrap(err, "Error creating GitHub Enterprise client.")
+			}
+		}
 		repository, response, err = pushService.githubEnterpriseClient.Repositories.Edit(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, &desiredRepositoryProperties)
 		if err != nil {
-			if response.StatusCode == http.StatusNotFound && !githubapiutil.HasAnyScope(response, "public_repo", "repo") {
-				return nil, usererrors.New("The destination token you have provided does not have the `public_repo` scope.")
+			if response.StatusCode == http.StatusNotFound {
+				if !githubapiutil.HasAnyScope(response, "public_repo", "repo") {
+					return nil, usererrors.New("The destination token you have provided does not have the `public_repo` scope.")
+				} else {
+					return nil, fmt.Errorf("You don't have permission to update the repository at %s/%s.", pushService.destinationRepositoryOwner, pushService.destinationRepositoryName)
+				}
 			}
 			return nil, errors.Wrap(err, "Error updating destination repository.")
 		}
