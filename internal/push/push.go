@@ -76,7 +76,7 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 				Name:  github.String(pushService.destinationRepositoryOwner),
 			}, user.GetLogin())
 			if err != nil {
-				if response != nil && response.StatusCode == http.StatusNotFound && githubapiutil.MissingAllScopes(response, "site_admin") {
+				if response != nil && response.StatusCode == http.StatusNotFound && !githubapiutil.HasAnyScope(response, "site_admin") {
 					return nil, usererrors.New("The destination token you have provided does not have the `site_admin` scope, so the destination organization cannot be created.")
 				}
 				return nil, errors.Wrap(err, "Error creating organization.")
@@ -105,7 +105,7 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 	if response.StatusCode == http.StatusNotFound {
 		repository, response, err = pushService.githubEnterpriseClient.Repositories.Create(pushService.ctx, destinationOrganization, &desiredRepositoryProperties)
 		if err != nil {
-			if response.StatusCode == http.StatusNotFound && githubapiutil.MissingAllScopes(response, "public_repo", "repo") {
+			if response.StatusCode == http.StatusNotFound && !githubapiutil.HasAnyScope(response, "public_repo", "repo") {
 				return nil, usererrors.New("The destination token you have provided does not have the `public_repo` scope.")
 			}
 			return nil, errors.Wrap(err, "Error creating destination repository.")
@@ -113,7 +113,7 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 	} else {
 		repository, response, err = pushService.githubEnterpriseClient.Repositories.Edit(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, &desiredRepositoryProperties)
 		if err != nil {
-			if response.StatusCode == http.StatusNotFound && githubapiutil.MissingAllScopes(response, "public_repo", "repo") {
+			if response.StatusCode == http.StatusNotFound && !githubapiutil.HasAnyScope(response, "public_repo", "repo") {
 				return nil, usererrors.New("The destination token you have provided does not have the `public_repo` scope.")
 			}
 			return nil, errors.Wrap(err, "Error updating destination repository.")
