@@ -15,6 +15,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 
 	"github.com/google/go-github/v32/github"
 )
@@ -29,13 +30,14 @@ func getTestPushService(t *testing.T, cacheDirectoryString string, githubEnterpr
 	} else {
 		githubEnterpriseClient = nil
 	}
+	token := oauth2.Token{AccessToken: "token"}
 	return pushService{
 		ctx:                        context.Background(),
 		cacheDirectory:             cacheDirectory,
 		githubEnterpriseClient:     githubEnterpriseClient,
 		destinationRepositoryOwner: "destination-repository-owner",
 		destinationRepositoryName:  "destination-repository-name",
-		destinationToken:           "token",
+		destinationToken:           &token,
 	}
 }
 

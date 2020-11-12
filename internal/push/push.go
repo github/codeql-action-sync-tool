@@ -43,7 +43,8 @@ type pushService struct {
 	githubEnterpriseClient     *github.Client
 	destinationRepositoryName  string
 	destinationRepositoryOwner string
-	destinationToken           string
+	destinationToken           *oauth2.Token
+	actionsAdminUser           string
 	force                      bool
 	pushSSH                    bool
 }
@@ -82,6 +83,19 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 				return nil, errors.Wrap(err, "Error creating organization.")
 			}
 		}
+
+		_, response, err = pushService.githubEnterpriseClient.Organizations.GetOrgMembership(pushService.ctx, user.GetLogin(), pushService.destinationRepositoryOwner)
+		if err != nil && (response == nil || response.StatusCode != http.StatusNotFound) {
+			return nil, errors.Wrap(err, "Failed to check membership of destination organization.")
+		}
+		if err != nil && githubapiutil.HasAnyScope(response, "site_admin") {
+			log.Debugf("No access to destination organization. Switching to impersonation token for %s...", pushService.actionsAdminUser)
+			impersonationToken, _, err := pushService.githubEnterpriseClient.Admin.CreateUserImpersonation(pushService.ctx, pushService.actionsAdminUser, &github.ImpersonateUserOptions{Scopes: []string{"public_repo", "workflow"}})
+			if err != nil {
+				return nil, errors.Wrap(err, "Failed to impersonate Actions admin user.")
+			}
+			pushService.destinationToken.AccessToken = impersonationToken.GetToken()
+		}
 	}
 
 	repository, response, err := pushService.githubEnterpriseClient.Repositories.Get(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName)
@@ -111,28 +125,13 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 			return nil, errors.Wrap(err, "Error creating destination repository.")
 		}
 	} else {
-		if githubapiutil.HasAnyScope(response, "site_admin") {
-			impersonationToken, _, err := pushService.githubEnterpriseClient.Admin.CreateUserImpersonation(pushService.ctx, "actions-admin", &github.ImpersonateUserOptions{Scopes: []string{"repo"}})
-			if err != nil {
-				return nil, errors.Wrap(err, "Failed to impersonate Actions admin user.")
-			}
-			tokenSource := oauth2.StaticTokenSource(
-				&oauth2.Token{AccessToken: impersonationToken.GetToken()},
-			)
-			tokenClient := oauth2.NewClient(pushService.ctx, tokenSource)
-			pushService.destinationToken = impersonationToken.GetToken()
-			pushService.githubEnterpriseClient, err = github.NewEnterpriseClient(pushService.githubEnterpriseClient.BaseURL.String(), pushService.githubEnterpriseClient.UploadURL.String(), tokenClient)
-			if err != nil {
-				return nil, errors.Wrap(err, "Error creating GitHub Enterprise client.")
-			}
-		}
 		repository, response, err = pushService.githubEnterpriseClient.Repositories.Edit(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, &desiredRepositoryProperties)
 		if err != nil {
 			if response.StatusCode == http.StatusNotFound {
 				if !githubapiutil.HasAnyScope(response, "public_repo", "repo") {
 					return nil, usererrors.New("The destination token you have provided does not have the `public_repo` scope.")
 				} else {
-					return nil, fmt.Errorf("You don't have permission to update the repository at %s/%s.", pushService.destinationRepositoryOwner, pushService.destinationRepositoryName)
+					return nil, fmt.Errorf("You don't have permission to update the repository at %s/%s. If you wish to update the bundled CodeQL Action please provide a token with the `site_admin` scope.", pushService.destinationRepositoryOwner, pushService.destinationRepositoryName)
 				}
 			}
 			return nil, errors.Wrap(err, "Error updating destination repository.")
@@ -164,7 +163,7 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 
 	credentials := &githttp.BasicAuth{
 		Username: "x-access-token",
-		Password: pushService.destinationToken,
+		Password: pushService.destinationToken.AccessToken,
 	}
 	if pushService.pushSSH {
 		// Use the SSH key from the environment.
@@ -346,7 +345,7 @@ func (pushService *pushService) pushReleases() error {
 	return nil
 }
 
-func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, destinationURL string, destinationToken string, destinationRepository string, force bool, pushSSH bool) error {
+func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, destinationURL string, destinationToken string, destinationRepository string, actionsAdminUser string, force bool, pushSSH bool) error {
 	err := cacheDirectory.CheckOrCreateVersionFile(false, version.Version())
 	if err != nil {
 		return err
@@ -357,8 +356,9 @@ func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, des
 	}
 
 	destinationURL = strings.TrimRight(destinationURL, "/")
+	token := oauth2.Token{AccessToken: destinationToken}
 	tokenSource := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: destinationToken},
+		&token,
 	)
 	tokenClient := oauth2.NewClient(ctx, tokenSource)
 	client, err := github.NewEnterpriseClient(destinationURL+"/api/v3", destinationURL+"/api/uploads", tokenClient)
@@ -376,7 +376,8 @@ func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, des
 		githubEnterpriseClient:     client,
 		destinationRepositoryOwner: destinationRepositoryOwner,
 		destinationRepositoryName:  destinationRepositoryName,
-		destinationToken:           destinationToken,
+		destinationToken:           &token,
+		actionsAdminUser:           actionsAdminUser,
 		force:                      force,
 		pushSSH:                    pushSSH,
 	}
