@@ -20,12 +20,13 @@ From a machine with access to both GitHub.com and GitHub Enterprise Server use t
 
 **Required Arguments:**
 * `--destination-url` - The URL of the GitHub Enterprise Server instance to push the Action to.
-* `--destination-token` - A [Personal Access Token](https://docs.github.com/en/enterprise/user/github/authenticating-to-github/creating-a-personal-access-token) for the destination GitHub Enterprise Server instance. The token should be granted at least the `public_repo` scope. If the destination repository is in an organization that does not yet exist, your token will need to have the `site_admin` scope in order to create the organization. The organization can also be created manually or an existing organization used.
+* `--destination-token` - A [Personal Access Token](https://docs.github.com/en/enterprise/user/github/authenticating-to-github/creating-a-personal-access-token) for the destination GitHub Enterprise Server instance. The token should be granted at least the `public_repo` scope. If the destination repository is in an organization that does not yet exist or that you are not an owner of, your token will need to have the `site_admin` scope in order to create the organization. The organization can also be created manually or an existing organization used.
 
 **Optional Arguments:**
 * `--cache-dir` - A temporary directory in which to store data downloaded from GitHub.com before it is uploaded to GitHub Enterprise Server. If not specified a directory next to the sync tool will be used.
 * `--source-token` - A token to access the API of GitHub.com. This is normally not required, but can be provided if you have issues with API rate limiting. The token does not need to have any scopes.
 * `--destination-repository` - The name of the repository in which to create or update the CodeQL Action. If not specified `github/codeql-action` will be used.
+* `--actions-admin-user` - The name of the Actions admin user, which will be used if you are updating the bundled CodeQL Action. If not specified `actions-admin` will be used.
 * `--force` - By default the tool will not overwrite existing repositories. Providing this flag will allow it to.
 * `--push-ssh` - Push Git contents over SSH rather than HTTPS. To use this option you must have SSH access to your GitHub Enterprise instance configured.
 
@@ -42,11 +43,12 @@ Now use the `./codeql-action-sync push` command to upload the CodeQL Action and 
 
 **Required Arguments:**
 * `--destination-url` - The URL of the GitHub Enterprise Server instance to push the Action to.
-* `--destination-token` - A [Personal Access Token](https://docs.github.com/en/enterprise/user/github/authenticating-to-github/creating-a-personal-access-token) for the destination GitHub Enterprise Server instance. The token should be granted at least the `public_repo` scope. If the destination repository is in an organization that does not yet exist, your token will need to have the `site_admin` scope in order to create the organization. The organization can also be created manually or an existing organization used.
+* `--destination-token` - A [Personal Access Token](https://docs.github.com/en/enterprise/user/github/authenticating-to-github/creating-a-personal-access-token) for the destination GitHub Enterprise Server instance. The token should be granted at least the `public_repo` scope. If the destination repository is in an organization that does not yet exist or that you are not an owner of, your token will need to have the `site_admin` scope in order to create the organization. The organization can also be created manually or an existing organization used.
 
 **Optional Arguments:**
 * `--cache-dir` - The directory to which the Action was previously downloaded.
 * `--destination-repository` - The name of the repository in which to create or update the CodeQL Action. If not specified `github/codeql-action` will be used.
+* `--actions-admin-user` - The name of the Actions admin user, which will be used if you are updating the bundled CodeQL Action. If not specified `actions-admin` will be used.
 * `--force` - By default the tool will not overwrite existing repositories. Providing this flag will allow it to.
 * `--push-ssh` - Push Git contents over SSH rather than HTTPS. To use this option you must have SSH access to your GitHub Enterprise instance configured.
 

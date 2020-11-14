@@ -8,7 +8,7 @@ import (
 
 const xOAuthScopesHeader = "X-OAuth-Scopes"
 
-func MissingAllScopes(response *github.Response, requiredAnyScopes ...string) bool {
+func HasAnyScope(response *github.Response, scopes ...string) bool {
 	if response == nil {
 		return false
 	}
@@ -18,11 +18,11 @@ func MissingAllScopes(response *github.Response, requiredAnyScopes ...string) bo
 	actualScopes := strings.Split(response.Header.Get(xOAuthScopesHeader), ",")
 	for _, actualScope := range actualScopes {
 		actualScope = strings.Trim(actualScope, " ")
-		for _, requiredAnyScope := range requiredAnyScopes {
-			if actualScope == requiredAnyScope {
-				return false
+		for _, requiredScope := range scopes {
+			if actualScope == requiredScope {
+				return true
 			}
 		}
 	}
-	return true
+	return false
 }

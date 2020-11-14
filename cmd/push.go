@@ -13,7 +13,7 @@ var pushCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		version.LogVersion()
 		cacheDirectory := cachedirectory.NewCacheDirectory(rootFlags.cacheDir)
-		return push.Push(cmd.Context(), cacheDirectory, pushFlags.destinationURL, pushFlags.destinationToken, pushFlags.destinationRepository, pushFlags.force, pushFlags.pushSSH)
+		return push.Push(cmd.Context(), cacheDirectory, pushFlags.destinationURL, pushFlags.destinationToken, pushFlags.destinationRepository, pushFlags.actionsAdminUser, pushFlags.force, pushFlags.pushSSH)
 	},
 }
 
@@ -21,6 +21,7 @@ type pushFlagFields struct {
 	destinationURL        string
 	destinationToken      string
 	destinationRepository string
+	actionsAdminUser      string
 	force                 bool
 	pushSSH               bool
 }
@@ -33,6 +34,7 @@ func (f *pushFlagFields) Init(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&f.destinationToken, "destination-token", "", "A token to access the API on the GitHub Enterprise instance.")
 	cmd.MarkFlagRequired("destination-token")
 	cmd.Flags().StringVar(&f.destinationRepository, "destination-repository", "github/codeql-action", "The name of the repository to create on GitHub Enterprise.")
+	cmd.Flags().StringVar(&f.actionsAdminUser, "actions-admin-user", "actions-admin", "The name of the Actions admin user.")
 	cmd.Flags().BoolVar(&f.force, "force", false, "Replace the existing repository even if it was not created by the sync tool.")
 	cmd.Flags().BoolVar(&f.pushSSH, "push-ssh", false, "Push Git contents over SSH rather than HTTPS. To use this option you must have SSH access to your GitHub Enterprise instance configured.")
 }
