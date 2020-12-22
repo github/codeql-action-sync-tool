@@ -37,6 +37,9 @@ const repositoryHomepage = "https://github.com/github/codeql-action-sync-tool/"
 const errorAlreadyExists = "The destination repository already exists, but it was not created with the CodeQL Action sync tool. If you are sure you want to push the CodeQL Action to it, re-run this command with the `--force` flag."
 const errorInvalidDestinationToken = "The destination token you've provided is not valid."
 
+const enterpriseAPIPath = "/api/v3"
+const enterpriseUploadsPath = "/api/uploads"
+
 type pushService struct {
 	ctx                        context.Context
 	cacheDirectory             cachedirectory.CacheDirectory
@@ -361,9 +364,30 @@ func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, des
 		&token,
 	)
 	tokenClient := oauth2.NewClient(ctx, tokenSource)
-	client, err := github.NewEnterpriseClient(destinationURL+"/api/v3", destinationURL+"/api/uploads", tokenClient)
+	client, err := github.NewEnterpriseClient(destinationURL+enterpriseAPIPath, destinationURL+enterpriseUploadsPath, tokenClient)
 	if err != nil {
 		return errors.Wrap(err, "Error creating GitHub Enterprise client.")
+	}
+	rootRequest, err := client.NewRequest("GET", enterpriseAPIPath, nil)
+	if err != nil {
+		return errors.Wrap(err, "Error constructing request for GitHub Enterprise client.")
+	}
+	rootResponse, err := client.Do(ctx, rootRequest, nil)
+	if err != nil {
+		return errors.Wrap(err, "Error checking connectivity for GitHub Enterprise client.")
+	}
+	if rootRequest.URL != rootResponse.Request.URL {
+		updatedBaseURL, _ := url.Parse(client.BaseURL.String())
+		updatedBaseURL.Scheme = rootResponse.Request.URL.Scheme
+		updatedBaseURL.Host = rootResponse.Request.URL.Host
+		log.Warnf("%s redirected to %s. The URL %s will be used for all API requests.", rootRequest.URL, rootResponse.Request.URL, updatedBaseURL)
+		updatedUploadsURL, _ := url.Parse(client.UploadURL.String())
+		updatedUploadsURL.Scheme = rootResponse.Request.URL.Scheme
+		updatedUploadsURL.Host = rootResponse.Request.URL.Host
+		client, err = github.NewEnterpriseClient(updatedBaseURL.String(), updatedUploadsURL.String(), tokenClient)
+		if err != nil {
+			return errors.Wrap(err, "Error creating GitHub Enterprise client.")
+		}
 	}
 
 	destinationRepositorySplit := strings.Split(destinationRepository, "/")
