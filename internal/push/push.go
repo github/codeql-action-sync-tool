@@ -39,6 +39,8 @@ const errorInvalidDestinationToken = "The destination token you've provided is n
 
 const enterpriseAPIPath = "/api/v3"
 const enterpriseUploadsPath = "/api/uploads"
+const enterpriseVersionHeaderKey = "X-GitHub-Enterprise-Version"
+const enterpriseAegisVersionHeaderValue = "GitHub AE"
 
 type pushService struct {
 	ctx                        context.Context
@@ -48,11 +50,21 @@ type pushService struct {
 	destinationRepositoryOwner string
 	destinationToken           *oauth2.Token
 	actionsAdminUser           string
+	aegis                      bool
 	force                      bool
 	pushSSH                    bool
 }
 
 func (pushService *pushService) createRepository() (*github.Repository, error) {
+	minimumRepositoryScope := "public_repo"
+	acceptableRepositoryScopes := []string{"public_repo", "repo"}
+	desiredVisibility := "public"
+	if pushService.aegis {
+		minimumRepositoryScope = "repo"
+		acceptableRepositoryScopes = []string{"repo"}
+		desiredVisibility = "internal"
+	}
+
 	log.Debug("Ensuring repository exists...")
 	user, response, err := pushService.githubEnterpriseClient.Users.Get(pushService.ctx, "")
 	if err != nil {
@@ -93,7 +105,7 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 		}
 		if err != nil && githubapiutil.HasAnyScope(response, "site_admin") {
 			log.Debugf("No access to destination organization. Switching to impersonation token for %s...", pushService.actionsAdminUser)
-			impersonationToken, _, err := pushService.githubEnterpriseClient.Admin.CreateUserImpersonation(pushService.ctx, pushService.actionsAdminUser, &github.ImpersonateUserOptions{Scopes: []string{"public_repo", "workflow"}})
+			impersonationToken, _, err := pushService.githubEnterpriseClient.Admin.CreateUserImpersonation(pushService.ctx, pushService.actionsAdminUser, &github.ImpersonateUserOptions{Scopes: []string{minimumRepositoryScope, "workflow"}})
 			if err != nil {
 				return nil, errors.Wrap(err, "Failed to impersonate Actions admin user.")
 			}
@@ -117,22 +129,28 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 		HasWiki:      github.Bool(false),
 		HasDownloads: github.Bool(false),
 		Archived:     github.Bool(false),
-		Private:      github.Bool(false),
+	}
+	if repository.GetVisibility() != desiredVisibility {
+		// For some reason if you provide a visibility it must be different than the current visibility.
+		// It seems to be the only property that behaves this way, so we have to treat is specially...
+		desiredRepositoryProperties.Visibility = github.String(desiredVisibility)
 	}
 	if response.StatusCode == http.StatusNotFound {
+		log.Debug("Repository does not exist. Creating it...")
 		repository, response, err = pushService.githubEnterpriseClient.Repositories.Create(pushService.ctx, destinationOrganization, &desiredRepositoryProperties)
 		if err != nil {
-			if response.StatusCode == http.StatusNotFound && !githubapiutil.HasAnyScope(response, "public_repo", "repo") {
-				return nil, usererrors.New("The destination token you have provided does not have the `public_repo` scope.")
+			if response.StatusCode == http.StatusNotFound && !githubapiutil.HasAnyScope(response, acceptableRepositoryScopes...) {
+				return nil, fmt.Errorf("The destination token you have provided does not have the `%s` scope.", minimumRepositoryScope)
 			}
 			return nil, errors.Wrap(err, "Error creating destination repository.")
 		}
 	} else {
+		log.Debug("Repository already exists. Updating its metadata...")
 		repository, response, err = pushService.githubEnterpriseClient.Repositories.Edit(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, &desiredRepositoryProperties)
 		if err != nil {
 			if response.StatusCode == http.StatusNotFound {
-				if !githubapiutil.HasAnyScope(response, "public_repo", "repo") {
-					return nil, usererrors.New("The destination token you have provided does not have the `public_repo` scope.")
+				if !githubapiutil.HasAnyScope(response, acceptableRepositoryScopes...) {
+					return nil, fmt.Errorf("The destination token you have provided does not have the `%s` scope.", minimumRepositoryScope)
 				} else {
 					return nil, fmt.Errorf("You don't have permission to update the repository at %s/%s. If you wish to update the bundled CodeQL Action please provide a token with the `site_admin` scope.", pushService.destinationRepositoryOwner, pushService.destinationRepositoryName)
 				}
@@ -389,6 +407,7 @@ func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, des
 			return errors.Wrap(err, "Error creating GitHub Enterprise client.")
 		}
 	}
+	aegis := rootResponse.Header.Get(enterpriseVersionHeaderKey) == enterpriseAegisVersionHeaderValue
 
 	destinationRepositorySplit := strings.Split(destinationRepository, "/")
 	destinationRepositoryOwner := destinationRepositorySplit[0]
@@ -402,6 +421,7 @@ func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, des
 		destinationRepositoryName:  destinationRepositoryName,
 		destinationToken:           &token,
 		actionsAdminUser:           actionsAdminUser,
+		aegis:                      aegis,
 		force:                      force,
 		pushSSH:                    pushSSH,
 	}

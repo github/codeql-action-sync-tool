@@ -20,7 +20,7 @@ From a machine with access to both GitHub.com and GitHub Enterprise Server use t
 
 **Required Arguments:**
 * `--destination-url` - The URL of the GitHub Enterprise Server instance to push the Action to.
-* `--destination-token` - A [Personal Access Token](https://docs.github.com/en/enterprise/user/github/authenticating-to-github/creating-a-personal-access-token) for the destination GitHub Enterprise Server instance. The token should be granted at least the `public_repo` scope. If the destination repository is in an organization that does not yet exist or that you are not an owner of, your token will need to have the `site_admin` scope in order to create the organization. The organization can also be created manually or an existing organization used.
+* `--destination-token` - A [Personal Access Token](https://docs.github.com/en/enterprise/user/github/authenticating-to-github/creating-a-personal-access-token) for the destination GitHub Enterprise Server instance. If the destination repository is in an organization that does not yet exist or that you are not an owner of, your token will need to have the `site_admin` scope in order to create the organization or update the repository in it. The organization can also be created manually or an existing organization that you own can be used, in which case the `repo` and `workflow` scopes are sufficient.
 
 **Optional Arguments:**
 * `--cache-dir` - A temporary directory in which to store data downloaded from GitHub.com before it is uploaded to GitHub Enterprise Server. If not specified a directory next to the sync tool will be used.
@@ -43,7 +43,7 @@ Now use the `./codeql-action-sync push` command to upload the CodeQL Action and 
 
 **Required Arguments:**
 * `--destination-url` - The URL of the GitHub Enterprise Server instance to push the Action to.
-* `--destination-token` - A [Personal Access Token](https://docs.github.com/en/enterprise/user/github/authenticating-to-github/creating-a-personal-access-token) for the destination GitHub Enterprise Server instance. The token should be granted at least the `public_repo` scope. If the destination repository is in an organization that does not yet exist or that you are not an owner of, your token will need to have the `site_admin` scope in order to create the organization. The organization can also be created manually or an existing organization used.
+* `--destination-token` - A [Personal Access Token](https://docs.github.com/en/enterprise/user/github/authenticating-to-github/creating-a-personal-access-token) for the destination GitHub Enterprise Server instance. If the destination repository is in an organization that does not yet exist or that you are not an owner of, your token will need to have the `site_admin` scope in order to create the organization or update the repository in it. The organization can also be created manually or an existing organization that you own can be used, in which case the `repo` and `workflow` scopes are sufficient.
 
 **Optional Arguments:**
 * `--cache-dir` - The directory to which the Action was previously downloaded.
