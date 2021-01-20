@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"crypto/tls"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -19,6 +21,7 @@ var rootCmd = &cobra.Command{
 
 type rootFlagFields struct {
 	cacheDir string
+	insecure bool
 }
 
 var rootFlags = rootFlagFields{}
@@ -34,6 +37,12 @@ func (f *rootFlagFields) Init(cmd *cobra.Command) error {
 	defaultCacheDir := path.Join(executableDirectoryPath, "cache")
 
 	cmd.PersistentFlags().StringVar(&f.cacheDir, "cache-dir", defaultCacheDir, "The path to a local directory to cache the Action in.")
+	cmd.PersistentFlags().BoolVar(&f.insecure, "insecure", false, "Allow insecure server connections when using TLS")
+	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		if f.insecure {
+			http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		}
+	}
 
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		cmd.PrintErrln(err)
