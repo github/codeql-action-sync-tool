@@ -99,12 +99,12 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 			}
 		}
 
-		_, response, err = pushService.githubEnterpriseClient.Organizations.IsMember(pushService.ctx, user.GetLogin(), pushService.destinationRepositoryOwner)
+		_, response, err = pushService.githubEnterpriseClient.Organizations.IsMember(pushService.ctx, pushService.destinationRepositoryOwner, user.GetLogin())
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to check membership of destination organization.")
 		}
 		if (response.StatusCode == http.StatusFound || response.StatusCode == http.StatusNotFound) && githubapiutil.HasAnyScope(response, "site_admin") {
-			log.Debugf("No access to destination organization. Switching to impersonation token for %s...", pushService.actionsAdminUser)
+			log.Debugf("No access to destination organization (status code %d). Switching to impersonation token for %s...", response.StatusCode, pushService.actionsAdminUser)
 			impersonationToken, _, err := pushService.githubEnterpriseClient.Admin.CreateUserImpersonation(pushService.ctx, pushService.actionsAdminUser, &github.ImpersonateUserOptions{Scopes: []string{minimumRepositoryScope, "workflow"}})
 			if err != nil {
 				return nil, errors.Wrap(err, "Failed to impersonate Actions admin user.")
