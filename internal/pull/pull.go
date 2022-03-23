@@ -29,7 +29,7 @@ import (
 
 const sourceOwner = "github"
 const sourceRepository = "codeql-action"
-const sourceURL = "https://github.com/" + sourceOwner + "/" + sourceRepository + ".git"
+const defaultSourceURL = "https://github.com/" + sourceOwner + "/" + sourceRepository + ".git"
 
 var relevantReferences = regexp.MustCompile("^refs/(heads|tags)/(main|v\\d+)$")
 
@@ -254,7 +254,7 @@ func (pullService *pullService) pullReleases() error {
 	return nil
 }
 
-func Pull(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, sourceToken string) error {
+func Pull(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, sourceToken string, sourceURL string) error {
 	err := cacheDirectory.CheckOrCreateVersionFile(true, version.Version())
 	if err != nil {
 		return err
@@ -270,6 +270,10 @@ func Pull(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, sou
 			&oauth2.Token{AccessToken: sourceToken},
 		)
 		tokenClient = oauth2.NewClient(ctx, tokenSource)
+	}
+
+	if sourceURL == "" {
+		sourceURL = defaultSourceURL
 	}
 
 	pullService := pullService{
