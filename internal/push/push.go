@@ -348,9 +348,9 @@ func (pushService *pushService) pushReleases() error {
 	if err != nil {
 		return errors.Wrap(err, "Error reading releases.")
 	}
-	for _, releasePathStat := range releasePathStats {
+	for index, releasePathStat := range releasePathStats {
 		releaseName := releasePathStat.Name()
-		log.Debugf("Pushing CodeQL bundles release %s...", releaseName)
+		log.Debugf("Pulling CodeQL bundle %s (%d/%d)...", releaseName, index+1, len(releasePathStats))
 		release, err := pushService.createOrUpdateRelease(releaseName)
 		if err != nil {
 			return err
