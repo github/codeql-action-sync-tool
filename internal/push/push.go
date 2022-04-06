@@ -300,8 +300,16 @@ func (pushService *pushService) uploadReleaseAsset(release *github.RepositoryRel
 func (pushService *pushService) createOrUpdateReleaseAsset(release *github.RepositoryRelease, existingAssets []*github.ReleaseAsset, assetPathStat os.FileInfo) error {
 	for _, existingAsset := range existingAssets {
 		if existingAsset.GetName() == assetPathStat.Name() {
-			if int64(existingAsset.GetSize()) == assetPathStat.Size() {
+			actualSize := int64(existingAsset.GetSize())
+			expectedSize := assetPathStat.Size()
+			if actualSize == expectedSize {
 				return nil
+			} else {
+				log.Warnf("Removing existing release asset %s because it was only partially-uploaded (had size %d, but should have been %d)...", existingAsset.GetName(), actualSize, expectedSize)
+				_, err := pushService.githubEnterpriseClient.Repositories.DeleteReleaseAsset(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, existingAsset.GetID())
+				if err != nil {
+					return errors.Wrap(err, "Error deleting existing release asset.")
+				}
 			}
 		}
 	}
@@ -333,6 +341,7 @@ func (pushService *pushService) pushReleases() error {
 	}
 	for _, releasePathStat := range releasePathStats {
 		releaseName := releasePathStat.Name()
+		log.Debugf("Pushing CodeQL bundles release %s...", releaseName)
 		release, err := pushService.createOrUpdateRelease(releaseName)
 		if err != nil {
 			return err
