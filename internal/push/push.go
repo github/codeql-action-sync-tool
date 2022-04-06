@@ -219,7 +219,12 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 		}
 		initialRefSpecs := []config.RefSpec{}
 		for _, releasePathStat := range releasePathStats {
-			initialRefSpecs = append(initialRefSpecs, config.RefSpec("+refs/tags/"+releasePathStat.Name()+":refs/tags/"+releasePathStat.Name()))
+			tagReferenceName := plumbing.NewTagReferenceName(releasePathStat.Name())
+			_, err := gitRepository.Reference(tagReferenceName, true)
+			if err != nil {
+				return errors.Wrapf(err, "Error finding local tag reference %s.", tagReferenceName)
+			}
+			initialRefSpecs = append(initialRefSpecs, config.RefSpec("+"+tagReferenceName.String()+":"+tagReferenceName.String()))
 		}
 		refSpecBatches = append(refSpecBatches, initialRefSpecs)
 	} else {
