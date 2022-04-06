@@ -53,6 +53,7 @@ type pushService struct {
 	aegis                      bool
 	force                      bool
 	pushSSH                    bool
+	gitURL                     string
 }
 
 func (pushService *pushService) createRepository() (*github.Repository, error) {
@@ -163,9 +164,12 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 }
 
 func (pushService *pushService) pushGit(repository *github.Repository, initialPush bool) error {
-	remoteURL := repository.GetCloneURL()
-	if pushService.pushSSH {
-		remoteURL = repository.GetSSHURL()
+	remoteURL := pushService.gitURL
+	if remoteURL == "" {
+		remoteURL = repository.GetCloneURL()
+		if pushService.pushSSH {
+			remoteURL = repository.GetSSHURL()
+		}
 	}
 	if initialPush {
 		log.Debugf("Pushing Git releases to %s...", remoteURL)
@@ -375,7 +379,7 @@ func (pushService *pushService) pushReleases() error {
 	return nil
 }
 
-func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, destinationURL string, destinationToken string, destinationRepository string, actionsAdminUser string, force bool, pushSSH bool) error {
+func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, destinationURL string, destinationToken string, destinationRepository string, actionsAdminUser string, force bool, pushSSH bool, gitURL string) error {
 	err := cacheDirectory.CheckOrCreateVersionFile(false, version.Version())
 	if err != nil {
 		return err
@@ -433,6 +437,7 @@ func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, des
 		aegis:                      aegis,
 		force:                      force,
 		pushSSH:                    pushSSH,
+		gitURL:                     gitURL,
 	}
 
 	repository, err := pushService.createRepository()
