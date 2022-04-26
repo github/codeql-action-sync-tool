@@ -144,9 +144,14 @@ func (pullService *pullService) findRelevantReleases() ([]string, error) {
 	err = references.ForEach(func(reference *plumbing.Reference) error {
 		if relevantReferences.MatchString(reference.Name().String()) {
 			log.Debugf("Found %s.", reference.Name().String())
-			commit, err := localRepository.CommitObject(reference.Hash())
+			resolvedReference, err := localRepository.ResolveRevision(plumbing.Revision(reference.Name()))
 			if err != nil {
-				return errors.Wrapf(err, "Error loading commit %s for reference %s.", reference.Hash(), reference.Name().String())
+				return errors.Wrap(err, "Error resolving revision.")
+			}
+			log.Debugf("Resolved to %s.", resolvedReference.String())
+			commit, err := localRepository.CommitObject(*resolvedReference)
+			if err != nil {
+				return errors.Wrapf(err, "Error loading commit %s for reference %s.", resolvedReference.String(), reference.Name().String())
 			}
 			file, err := commit.File(defaultConfigurationPath)
 			if err != nil {
@@ -154,11 +159,11 @@ func (pullService *pullService) findRelevantReleases() ([]string, error) {
 					log.Debugf("Ignoring reference %s as it does not have a default configuration.", reference.Name().String())
 					return nil
 				}
-				return errors.Wrapf(err, "Error loading default configuration file from commit %s for reference %s.", reference.Hash(), reference.Name().String())
+				return errors.Wrapf(err, "Error loading default configuration file from commit %s for reference %s.", resolvedReference.String(), reference.Name().String())
 			}
 			content, err := file.Contents()
 			if err != nil {
-				return errors.Wrapf(err, "Error reading default configuration file content from commit %s for reference %s.", reference.Hash(), reference.Name().String())
+				return errors.Wrapf(err, "Error reading default configuration file content from commit %s for reference %s.", resolvedReference.String(), reference.Name().String())
 			}
 			configuration, err := actionconfiguration.Parse(content)
 			if err != nil {
