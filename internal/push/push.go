@@ -350,7 +350,7 @@ func (pushService *pushService) pushReleases() error {
 	}
 	for index, releasePathStat := range releasePathStats {
 		releaseName := releasePathStat.Name()
-		log.Debugf("Pulling CodeQL bundle %s (%d/%d)...", releaseName, index+1, len(releasePathStats))
+		log.Debugf("Pushing CodeQL bundle %s (%d/%d)...", releaseName, index+1, len(releasePathStats))
 		release, err := pushService.createOrUpdateRelease(releaseName)
 		if err != nil {
 			return err
