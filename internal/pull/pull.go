@@ -13,6 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/github/codeql-action-sync/internal/actionconfiguration"
+	"github.com/github/codeql-action-sync/internal/githubapiutil"
 	"github.com/mitchellh/ioprogress"
 	"golang.org/x/oauth2"
 
@@ -191,9 +192,9 @@ func (pullService *pullService) pullReleases() error {
 
 	for index, releaseTag := range relevantReleases {
 		log.Debugf("Pulling CodeQL bundle %s (%d/%d)...", releaseTag, index+1, len(relevantReleases))
-		release, _, err := pullService.githubDotComClient.Repositories.GetReleaseByTag(pullService.ctx, sourceOwner, sourceRepository, releaseTag)
+		release, response, err := pullService.githubDotComClient.Repositories.GetReleaseByTag(pullService.ctx, sourceOwner, sourceRepository, releaseTag)
 		if err != nil {
-			return errors.Wrap(err, "Error loading CodeQL release information.")
+			return githubapiutil.EnrichResponseError(response, err, "Error loading CodeQL release information.")
 		}
 		err = os.MkdirAll(pullService.cacheDirectory.ReleasePath(releaseTag), 0755)
 		if err != nil {
