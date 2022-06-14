@@ -307,26 +307,10 @@ func (pushService *pushService) uploadReleaseAsset(release *github.RepositoryRel
 	return asset, response, nil
 }
 
-func (pushService *pushService) createOrUpdateReleaseAsset(release *github.RepositoryRelease, existingAssets []*github.ReleaseAsset, assetPathStat os.FileInfo) error {
-	for _, existingAsset := range existingAssets {
-		if existingAsset.GetName() == assetPathStat.Name() {
-			actualSize := int64(existingAsset.GetSize())
-			expectedSize := assetPathStat.Size()
-			if actualSize == expectedSize {
-				return nil
-			} else {
-				log.Warnf("Removing existing release asset %s because it was only partially-uploaded (had size %d, but should have been %d)...", existingAsset.GetName(), actualSize, expectedSize)
-				response, err := pushService.githubEnterpriseClient.Repositories.DeleteReleaseAsset(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, existingAsset.GetID())
-				if err != nil {
-					return githubapiutil.EnrichResponseError(response, err, "Error deleting existing release asset.")
-				}
-			}
-		}
-	}
-	log.Debugf("Uploading release asset %s...", assetPathStat.Name())
+func (pushService *pushService) uploadAsset(release *github.RepositoryRelease, assetPathStat os.FileInfo) (*github.Response, error) {
 	assetFile, err := os.Open(pushService.cacheDirectory.AssetPath(release.GetTagName(), assetPathStat.Name()))
 	if err != nil {
-		return errors.Wrap(err, "Error opening release asset.")
+		return nil, errors.Wrap(err, "Error opening release asset.")
 	}
 	defer assetFile.Close()
 	progressReader := &ioprogress.Reader{
@@ -334,11 +318,51 @@ func (pushService *pushService) createOrUpdateReleaseAsset(release *github.Repos
 		Size:     assetPathStat.Size(),
 		DrawFunc: ioprogress.DrawTerminalf(os.Stderr, ioprogress.DrawTextFormatBytes),
 	}
-	_, response, err := pushService.uploadReleaseAsset(release, assetPathStat, progressReader)
 	if err != nil {
-		return githubapiutil.EnrichResponseError(response, err, "Error uploading release asset.")
+		return nil, errors.Wrap(err, "Error opening release asset.")
 	}
-	return nil
+	_, response, err := pushService.uploadReleaseAsset(release, assetPathStat, progressReader)
+	return response, err
+}
+
+func (pushService *pushService) createOrUpdateReleaseAsset(release *github.RepositoryRelease, existingAssets []*github.ReleaseAsset, assetPathStat os.FileInfo) error {
+	attempt := 0
+	for {
+		attempt++
+		for _, existingAsset := range existingAssets {
+			if existingAsset.GetName() == assetPathStat.Name() {
+				actualSize := int64(existingAsset.GetSize())
+				expectedSize := assetPathStat.Size()
+				if actualSize == expectedSize {
+					return nil
+				} else {
+					log.Warnf("Removing existing release asset %s because it was only partially-uploaded (had size %d, but should have been %d)...", existingAsset.GetName(), actualSize, expectedSize)
+					response, err := pushService.githubEnterpriseClient.Repositories.DeleteReleaseAsset(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, existingAsset.GetID())
+					if err != nil {
+						return githubapiutil.EnrichResponseError(response, err, "Error deleting existing release asset.")
+					}
+				}
+			}
+		}
+		log.Debugf("Uploading release asset %s...", assetPathStat.Name())
+		response, err := pushService.uploadAsset(release, assetPathStat)
+		if err == nil {
+			return nil
+		} else {
+			if githubErrorResponse := new(github.ErrorResponse); errors.As(err, &githubErrorResponse) {
+				for _, innerError := range githubErrorResponse.Errors {
+					if innerError.Code == "already_exists" {
+						log.Warn("Asset already existed.")
+						return nil
+					}
+				}
+			}
+			if response == nil || response.StatusCode < 500 || attempt >= 5 {
+				return err
+			}
+			log.Warnf("Attempt %d failed to upload release asset (%s), retrying...", attempt, err.Error())
+		}
+	}
 }
 
 func (pushService *pushService) pushReleases() error {
