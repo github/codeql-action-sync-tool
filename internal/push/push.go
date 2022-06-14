@@ -72,7 +72,7 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 		if response != nil && response.StatusCode == http.StatusUnauthorized {
 			return nil, usererrors.New(errorInvalidDestinationToken)
 		}
-		return nil, errors.Wrap(err, "Error getting current user.")
+		return nil, githubapiutil.EnrichResponseError(response, err, "Error getting current user.")
 	}
 
 	// When creating a repository we can either create it in a named organization or under the current user (represented in go-github by an empty string).
@@ -84,11 +84,11 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 	if destinationOrganization != "" {
 		_, response, err := pushService.githubEnterpriseClient.Organizations.Get(pushService.ctx, pushService.destinationRepositoryOwner)
 		if err != nil && (response == nil || response.StatusCode != http.StatusNotFound) {
-			return nil, errors.Wrap(err, "Error checking if destination organization exists.")
+			return nil, githubapiutil.EnrichResponseError(response, err, "Error checking if destination organization exists.")
 		}
 		if response != nil && response.StatusCode == http.StatusNotFound {
 			log.Debugf("The organization %s does not exist. Creating it...", pushService.destinationRepositoryOwner)
-			_, _, err := pushService.githubEnterpriseClient.Admin.CreateOrg(pushService.ctx, &github.Organization{
+			_, response, err := pushService.githubEnterpriseClient.Admin.CreateOrg(pushService.ctx, &github.Organization{
 				Login: github.String(pushService.destinationRepositoryOwner),
 				Name:  github.String(pushService.destinationRepositoryOwner),
 			}, user.GetLogin())
@@ -96,19 +96,19 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 				if response != nil && response.StatusCode == http.StatusNotFound && !githubapiutil.HasAnyScope(response, "site_admin") {
 					return nil, usererrors.New("The destination token you have provided does not have the `site_admin` scope, so the destination organization cannot be created.")
 				}
-				return nil, errors.Wrap(err, "Error creating organization.")
+				return nil, githubapiutil.EnrichResponseError(response, err, "Error creating organization.")
 			}
 		}
 
 		_, response, err = pushService.githubEnterpriseClient.Organizations.IsMember(pushService.ctx, pushService.destinationRepositoryOwner, user.GetLogin())
 		if err != nil {
-			return nil, errors.Wrap(err, "Failed to check membership of destination organization.")
+			return nil, githubapiutil.EnrichResponseError(response, err, "Failed to check membership of destination organization.")
 		}
 		if (response.StatusCode == http.StatusFound || response.StatusCode == http.StatusNotFound) && githubapiutil.HasAnyScope(response, "site_admin") {
 			log.Debugf("No access to destination organization (status code %d). Switching to impersonation token for %s...", response.StatusCode, pushService.actionsAdminUser)
-			impersonationToken, _, err := pushService.githubEnterpriseClient.Admin.CreateUserImpersonation(pushService.ctx, pushService.actionsAdminUser, &github.ImpersonateUserOptions{Scopes: []string{minimumRepositoryScope, "workflow"}})
+			impersonationToken, response, err := pushService.githubEnterpriseClient.Admin.CreateUserImpersonation(pushService.ctx, pushService.actionsAdminUser, &github.ImpersonateUserOptions{Scopes: []string{minimumRepositoryScope, "workflow"}})
 			if err != nil {
-				return nil, errors.Wrap(err, "Failed to impersonate Actions admin user.")
+				return nil, githubapiutil.EnrichResponseError(response, err, "Failed to impersonate Actions admin user.")
 			}
 			pushService.destinationToken.AccessToken = impersonationToken.GetToken()
 		}
@@ -116,7 +116,7 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 
 	repository, response, err := pushService.githubEnterpriseClient.Repositories.Get(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName)
 	if err != nil && (response == nil || response.StatusCode != http.StatusNotFound) {
-		return nil, errors.Wrap(err, "Error checking if destination repository exists.")
+		return nil, githubapiutil.EnrichResponseError(response, err, "Error checking if destination repository exists.")
 	}
 	if response.StatusCode != http.StatusNotFound && repositoryHomepage != repository.GetHomepage() && !pushService.force {
 		return nil, errors.Errorf(errorAlreadyExists)
@@ -143,7 +143,7 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 			if response.StatusCode == http.StatusNotFound && !githubapiutil.HasAnyScope(response, acceptableRepositoryScopes...) {
 				return nil, fmt.Errorf("The destination token you have provided does not have the `%s` scope.", minimumRepositoryScope)
 			}
-			return nil, errors.Wrap(err, "Error creating destination repository.")
+			return nil, githubapiutil.EnrichResponseError(response, err, "Error creating destination repository.")
 		}
 	} else {
 		log.Debug("Repository already exists. Updating its metadata...")
@@ -156,7 +156,7 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 					return nil, fmt.Errorf("You don't have permission to update the repository at %s/%s. If you wish to update the bundled CodeQL Action please provide a token with the `site_admin` scope.", pushService.destinationRepositoryOwner, pushService.destinationRepositoryName)
 				}
 			}
-			return nil, errors.Wrap(err, "Error updating destination repository.")
+			return nil, githubapiutil.EnrichResponseError(response, err, "Error updating destination repository.")
 		}
 	}
 
@@ -212,6 +212,7 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 	}
 	refSpecBatches = append(refSpecBatches, deleteRefSpecs)
 
+	defaultBranchRefSpec := "+refs/heads/main:refs/heads/main"
 	if initialPush {
 		releasePathStats, err := ioutil.ReadDir(pushService.cacheDirectory.ReleasesPath())
 		if err != nil {
@@ -228,10 +229,10 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 		}
 		refSpecBatches = append(refSpecBatches, initialRefSpecs)
 	} else {
-		// We've got to push `main` on its own, so that it will be made the default branch if the repository has just been created. We then push everything else afterwards.
+		// We've got to push the default branch on its own, so that it will be made the default branch if the repository has just been created. We then push everything else afterwards.
 		refSpecBatches = append(refSpecBatches,
 			[]config.RefSpec{
-				config.RefSpec("+refs/heads/main:refs/heads/main"),
+				config.RefSpec(defaultBranchRefSpec),
 			},
 			[]config.RefSpec{
 				config.RefSpec("+refs/*:refs/*"),
@@ -270,20 +271,20 @@ func (pushService *pushService) createOrUpdateRelease(releaseName string) (*gith
 
 	release, response, err := pushService.githubEnterpriseClient.Repositories.GetReleaseByTag(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, releaseMetadata.GetTagName())
 	if err != nil && response.StatusCode != http.StatusNotFound {
-		return nil, errors.Wrap(err, "Error checking for existing CodeQL release.")
+		return nil, githubapiutil.EnrichResponseError(response, err, "Error checking for existing CodeQL release.")
 	}
 	if release == nil {
 		log.Debugf("Creating release %s...", releaseMetadata.GetTagName())
-		release, _, err := pushService.githubEnterpriseClient.Repositories.CreateRelease(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, &releaseMetadata)
+		release, response, err := pushService.githubEnterpriseClient.Repositories.CreateRelease(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, &releaseMetadata)
 		if err != nil {
-			return nil, errors.Wrap(err, "Error creating release.")
+			return nil, githubapiutil.EnrichResponseError(response, err, "Error creating release.")
 		}
 		return release, nil
 	}
-	release, _, err = pushService.githubEnterpriseClient.Repositories.EditRelease(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, release.GetID(), &releaseMetadata)
+	release, response, err = pushService.githubEnterpriseClient.Repositories.EditRelease(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, release.GetID(), &releaseMetadata)
 	if err != nil {
 		log.Debugf("Updating release %s...", releaseMetadata.GetTagName())
-		return nil, errors.Wrap(err, "Error updating release.")
+		return nil, githubapiutil.EnrichResponseError(response, err, "Error updating release.")
 	}
 	return release, nil
 }
@@ -301,7 +302,7 @@ func (pushService *pushService) uploadReleaseAsset(release *github.RepositoryRel
 	asset := &github.ReleaseAsset{}
 	response, err := pushService.githubEnterpriseClient.Do(pushService.ctx, request, asset)
 	if err != nil {
-		return nil, response, errors.Wrap(err, "Error uploading release asset.")
+		return nil, response, githubapiutil.EnrichResponseError(response, err, "Error uploading release asset.")
 	}
 	return asset, response, nil
 }
@@ -315,9 +316,9 @@ func (pushService *pushService) createOrUpdateReleaseAsset(release *github.Repos
 				return nil
 			} else {
 				log.Warnf("Removing existing release asset %s because it was only partially-uploaded (had size %d, but should have been %d)...", existingAsset.GetName(), actualSize, expectedSize)
-				_, err := pushService.githubEnterpriseClient.Repositories.DeleteReleaseAsset(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, existingAsset.GetID())
+				response, err := pushService.githubEnterpriseClient.Repositories.DeleteReleaseAsset(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, existingAsset.GetID())
 				if err != nil {
-					return errors.Wrap(err, "Error deleting existing release asset.")
+					return githubapiutil.EnrichResponseError(response, err, "Error deleting existing release asset.")
 				}
 			}
 		}
@@ -333,9 +334,9 @@ func (pushService *pushService) createOrUpdateReleaseAsset(release *github.Repos
 		Size:     assetPathStat.Size(),
 		DrawFunc: ioprogress.DrawTerminalf(os.Stderr, ioprogress.DrawTextFormatBytes),
 	}
-	_, _, err = pushService.uploadReleaseAsset(release, assetPathStat, progressReader)
+	_, response, err := pushService.uploadReleaseAsset(release, assetPathStat, progressReader)
 	if err != nil {
-		return errors.Wrap(err, "Error uploading release asset.")
+		return githubapiutil.EnrichResponseError(response, err, "Error uploading release asset.")
 	}
 	return nil
 }
@@ -358,9 +359,9 @@ func (pushService *pushService) pushReleases() error {
 
 		existingAssets := []*github.ReleaseAsset{}
 		for page := 1; ; page++ {
-			assets, _, err := pushService.githubEnterpriseClient.Repositories.ListReleaseAssets(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, release.GetID(), &github.ListOptions{Page: page})
+			assets, response, err := pushService.githubEnterpriseClient.Repositories.ListReleaseAssets(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, release.GetID(), &github.ListOptions{Page: page})
 			if err != nil {
-				return errors.Wrap(err, "Error fetching existing release assets.")
+				return githubapiutil.EnrichResponseError(response, err, "Error fetching existing release assets.")
 			}
 			if len(assets) == 0 {
 				break
@@ -376,7 +377,7 @@ func (pushService *pushService) pushReleases() error {
 		for _, assetPathStat := range assetPathStats {
 			err := pushService.createOrUpdateReleaseAsset(release, existingAssets, assetPathStat)
 			if err != nil {
-				return errors.Wrap(err, "Error uploading release assets.")
+				return err
 			}
 		}
 	}
@@ -410,7 +411,7 @@ func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, des
 	}
 	rootResponse, err := client.Do(ctx, rootRequest, nil)
 	if err != nil {
-		return errors.Wrap(err, "Error checking connectivity for GitHub Enterprise client.")
+		return githubapiutil.EnrichResponseError(rootResponse, err, "Error checking connectivity for GitHub Enterprise client.")
 	}
 	if rootRequest.URL != rootResponse.Request.URL {
 		updatedBaseURL, _ := url.Parse(client.BaseURL.String())
