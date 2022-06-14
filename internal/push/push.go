@@ -307,6 +307,24 @@ func (pushService *pushService) uploadReleaseAsset(release *github.RepositoryRel
 	return asset, response, nil
 }
 
+func (pushService *pushService) uploadAsset(release *github.RepositoryRelease, assetPathStat os.FileInfo) (*github.Response, error) {
+	assetFile, err := os.Open(pushService.cacheDirectory.AssetPath(release.GetTagName(), assetPathStat.Name()))
+	if err != nil {
+		return nil, errors.Wrap(err, "Error opening release asset.")
+	}
+	defer assetFile.Close()
+	progressReader := &ioprogress.Reader{
+		Reader:   assetFile,
+		Size:     assetPathStat.Size(),
+		DrawFunc: ioprogress.DrawTerminalf(os.Stderr, ioprogress.DrawTextFormatBytes),
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "Error opening release asset.")
+	}
+	_, response, err := pushService.uploadReleaseAsset(release, assetPathStat, progressReader)
+	return response, err
+}
+
 func (pushService *pushService) createOrUpdateReleaseAsset(release *github.RepositoryRelease, existingAssets []*github.ReleaseAsset, assetPathStat os.FileInfo) error {
 	attempt := 0
 	for {
@@ -327,20 +345,7 @@ func (pushService *pushService) createOrUpdateReleaseAsset(release *github.Repos
 			}
 		}
 		log.Debugf("Uploading release asset %s...", assetPathStat.Name())
-		assetFile, err := os.Open(pushService.cacheDirectory.AssetPath(release.GetTagName(), assetPathStat.Name()))
-		if err != nil {
-			return errors.Wrap(err, "Error opening release asset.")
-		}
-		defer assetFile.Close()
-		progressReader := &ioprogress.Reader{
-			Reader:   assetFile,
-			Size:     assetPathStat.Size(),
-			DrawFunc: ioprogress.DrawTerminalf(os.Stderr, ioprogress.DrawTextFormatBytes),
-		}
-		if err != nil {
-			return errors.Wrap(err, "Error opening release asset.")
-		}
-		_, response, err := pushService.uploadReleaseAsset(release, assetPathStat, progressReader)
+		response, err := pushService.uploadAsset(release, assetPathStat)
 		if err == nil {
 			return nil
 		} else {
