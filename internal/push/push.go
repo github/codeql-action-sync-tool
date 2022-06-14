@@ -212,7 +212,7 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 	}
 	refSpecBatches = append(refSpecBatches, deleteRefSpecs)
 
-	defaultBrachRefSpec := "+refs/heads/main:refs/heads/main"
+	defaultBranchRefSpec := "+refs/heads/main:refs/heads/main"
 	if initialPush {
 		releasePathStats, err := ioutil.ReadDir(pushService.cacheDirectory.ReleasesPath())
 		if err != nil {
@@ -232,7 +232,7 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 		// We've got to push the default branch on its own, so that it will be made the default branch if the repository has just been created. We then push everything else afterwards.
 		refSpecBatches = append(refSpecBatches,
 			[]config.RefSpec{
-				config.RefSpec(defaultBrachRefSpec),
+				config.RefSpec(defaultBranchRefSpec),
 			},
 			[]config.RefSpec{
 				config.RefSpec("+refs/*:refs/*"),
