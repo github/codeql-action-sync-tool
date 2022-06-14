@@ -325,14 +325,14 @@ func (pushService *pushService) createOrUpdateReleaseAsset(release *github.Repos
 	}
 	log.Debugf("Uploading release asset %s...", assetPathStat.Name())
 	assetFile, err := os.Open(pushService.cacheDirectory.AssetPath(release.GetTagName(), assetPathStat.Name()))
+	if err != nil {
+		return errors.Wrap(err, "Error opening release asset.")
+	}
 	defer assetFile.Close()
 	progressReader := &ioprogress.Reader{
 		Reader:   assetFile,
 		Size:     assetPathStat.Size(),
 		DrawFunc: ioprogress.DrawTerminalf(os.Stderr, ioprogress.DrawTextFormatBytes),
-	}
-	if err != nil {
-		return errors.Wrap(err, "Error opening release asset.")
 	}
 	_, response, err := pushService.uploadReleaseAsset(release, assetPathStat, progressReader)
 	if err != nil {
