@@ -246,32 +246,6 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 				Auth:     credentials,
 				Progress: os.Stderr,
 			})
-			if err != nil && strings.Contains(err.Error(), "pre-receive hook declined") {
-				log.Warn("Push was rejected by a pre-receive hook. This may be because force-pushing is not allowed. Will try and remove and recreate the branch.")
-				if len(refSpecs) == 1 && refSpecs[0].String() == defaultBrachRefSpec {
-					// todo
-				}
-				negativeRefSpecs := []config.RefSpec{}
-				for _, refSpec := range refSpecs {
-					negativeRefSpecs = append(negativeRefSpecs, config.RefSpec(":"+refSpec.Src()))
-					err = remote.PushContext(pushService.ctx, &git.PushOptions{
-						RefSpecs: negativeRefSpecs,
-						Auth:     credentials,
-						Progress: os.Stderr,
-					})
-					if err != nil {
-						return errors.Wrap(err, "Error removing existing refs.")
-					}
-					err = remote.PushContext(pushService.ctx, &git.PushOptions{
-						RefSpecs: refSpecs,
-						Auth:     credentials,
-						Progress: os.Stderr,
-					})
-					if err != nil && errors.Cause(err) != git.NoErrAlreadyUpToDate {
-						return errors.Wrap(err, "Error pushing Action to GitHub Enterprise Server.")
-					}
-				}
-			}
 			if err != nil && errors.Cause(err) != git.NoErrAlreadyUpToDate {
 				return errors.Wrap(err, "Error pushing Action to GitHub Enterprise Server.")
 			}
