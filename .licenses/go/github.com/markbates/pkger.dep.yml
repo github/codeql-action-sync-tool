@@ -1,9 +1,9 @@
 ---
 name: github.com/markbates/pkger
-version: v0.17.0
+version: v0.17.1
 type: go
-summary: 
-homepage: https://godoc.org/github.com/markbates/pkger
+summary:
+homepage: https://pkg.go.dev/github.com/markbates/pkger
 license: mit
 licenses:
 - sources: LICENSE
