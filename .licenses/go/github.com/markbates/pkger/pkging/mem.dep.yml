@@ -1,12 +1,12 @@
 ---
 name: github.com/markbates/pkger/pkging/mem
-version: v0.17.0
+version: v0.17.1
 type: go
 summary:
 homepage: https://pkg.go.dev/github.com/markbates/pkger/pkging/mem
 license: mit
 licenses:
-- sources: pkger@v0.17.0/LICENSE
+- sources: pkger@v0.17.1/LICENSE
   text: |
     The MIT License (MIT)
 
