@@ -1,10 +1,10 @@
 ---
 name: github.com/spf13/cobra
-version: v1.0.0
+version: v1.8.0
 type: go
 summary: Package cobra is a commander providing a simple interface to create powerful
   modern CLI interfaces.
-homepage: https://godoc.org/github.com/spf13/cobra
+homepage: https://pkg.go.dev/github.com/spf13/cobra
 license: apache-2.0
 licenses:
 - sources: LICENSE.txt
@@ -184,5 +184,5 @@ licenses:
           incurred by, or claims asserted against, such Contributor by reason
           of your accepting any such warranty or additional liability.
 - sources: README.md
-  text: Cobra is released under the Apache 2.0 license. See [LICENSE.txt](https://github.com/spf13/cobra/blob/master/LICENSE.txt)
+  text: Cobra is released under the Apache 2.0 license. See [LICENSE.txt](LICENSE.txt)
 notices: []
