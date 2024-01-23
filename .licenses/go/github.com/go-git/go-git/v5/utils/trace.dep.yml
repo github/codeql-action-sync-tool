@@ -1,9 +1,9 @@
 ---
-name: github.com/go-git/go-git/v5/plumbing/filemode
+name: github.com/go-git/go-git/v5/utils/trace
 version: v5.11.0
 type: go
 summary: 
-homepage: https://pkg.go.dev/github.com/go-git/go-git/v5/plumbing/filemode
+homepage: https://pkg.go.dev/github.com/go-git/go-git/v5/utils/trace
 license: apache-2.0
 licenses:
 - sources: v5@v5.11.0/LICENSE
