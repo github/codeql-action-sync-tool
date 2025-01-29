@@ -2,7 +2,6 @@ package cachedirectory
 
 import (
 	usererrors "errors"
-	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -108,19 +107,17 @@ func (cacheDirectory *CacheDirectory) CheckOrCreateVersionFile(pull bool, versio
 			if !isAccessible {
 				return errors.Wrap(err, "Cache dir exists, but the current user can't write to it.")
 			}
-
-			isEmpty, err := isEmptyDirectory(cacheDirectory.path)
+		}
+		isEmpty, err := isEmptyDirectory(cacheDirectory.path)
+		if err != nil {
+			return err
+		}
+		if isEmpty {
+			err = ioutil.WriteFile(cacheVersionFilePath, []byte(version), 0644)
 			if err != nil {
-				return err
-			}
-			if isEmpty {
-				err = ioutil.WriteFile(cacheVersionFilePath, []byte(version), 0644)
-				if err != nil {
-					return errors.Wrap(err, "Could not create cache version file.")
-				}
+				return errors.Wrap(err, "Could not create cache version file.")
 			}
 			return nil
-			
 		}
 		return usererrors.New(errorNotACacheOrEmpty)
 	}
