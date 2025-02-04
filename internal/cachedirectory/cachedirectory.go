@@ -2,7 +2,6 @@ package cachedirectory
 
 import (
 	usererrors "errors"
-	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -27,24 +26,37 @@ func NewCacheDirectory(path string) CacheDirectory {
 	}
 }
 
-func isEmptyOrNonExistentDirectory(path string) (bool, error) {
-	f, err := os.Open(path)
+func isAccessibleDirectory(path string) (bool, error) {
+	_, err := os.Stat(path)
+
 	if err != nil {
 		if os.IsNotExist(err) {
-			return true, nil
+			return false, nil
 		}
 		return false, errors.Wrapf(err, "Could not access directory %s.", path)
 	}
-	defer f.Close()
 
-	_, err = f.Readdirnames(1)
+	return true, nil
+}
+
+func isEmptyDirectory(path string) (bool, error) {
+	files, err := ioutil.ReadDir(path)
 	if err != nil {
-		if err == io.EOF {
-			return true, nil
-		}
 		return false, errors.Wrapf(err, "Could not read contents of directory %s.", path)
 	}
-	return false, nil
+
+	return len(files) == 0, nil
+}
+
+func existsDirectory(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, errors.Wrapf(err, "Could not access directory %s.", path)
+	}
+	return true, nil
 }
 
 func (cacheDirectory *CacheDirectory) CheckOrCreateVersionFile(pull bool, version string) error {
@@ -77,15 +89,30 @@ func (cacheDirectory *CacheDirectory) CheckOrCreateVersionFile(pull bool, versio
 			}
 		}
 
-		isEmptyOrNonExistent, err := isEmptyOrNonExistentDirectory(cacheDirectory.path)
+		existsDirectory, err := existsDirectory(cacheDirectory.path)
 		if err != nil {
 			return err
 		}
-		if isEmptyOrNonExistent {
+		if !existsDirectory {
 			err := os.Mkdir(cacheDirectory.path, 0755)
 			if err != nil {
 				return errors.Wrap(err, "Could not create cache directory.")
 			}
+
+		} else {
+			isAccessible, err := isAccessibleDirectory(cacheDirectory.path)
+			if err != nil {
+				return err
+			}
+			if !isAccessible {
+				return errors.Wrap(err, "Cache dir exists, but the current user can't write to it.")
+			}
+		}
+		isEmpty, err := isEmptyDirectory(cacheDirectory.path)
+		if err != nil {
+			return err
+		}
+		if isEmpty {
 			err = ioutil.WriteFile(cacheVersionFilePath, []byte(version), 0644)
 			if err != nil {
 				return errors.Wrap(err, "Could not create cache version file.")
