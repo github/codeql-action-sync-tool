@@ -35,7 +35,7 @@ func isAccessibleDirectory(path string) (bool, error) {
 		}
 		return false, errors.Wrapf(err, "Could not access directory %s.", path)
 	}
-	
+
 	return true, nil
 }
 
