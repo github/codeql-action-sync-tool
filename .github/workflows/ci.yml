@@ -43,7 +43,7 @@ jobs:
 
   integration_ghes:
     name: Integration Test (GitHub Enterprise Server)
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest-xl
     if: ${{ github.event != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     steps:
       - name: Checkout
