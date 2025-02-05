@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"os"
 	"path"
 	"strconv"
 	"testing"
@@ -21,6 +22,8 @@ import (
 )
 
 func getTestPushService(t *testing.T, cacheDirectoryString string, githubEnterpriseURL string) pushService {
+	err := os.MkdirAll(path.Join(cacheDirectoryString, "refs"), 0777)
+	require.NoError(t, err)
 	cacheDirectory := cachedirectory.NewCacheDirectory(cacheDirectoryString)
 	var githubEnterpriseClient *github.Client
 	if githubEnterpriseURL != "" {

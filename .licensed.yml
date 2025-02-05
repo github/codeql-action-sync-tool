@@ -8,3 +8,4 @@ allowed:
 ignored:
   go:
     - golang.org/x/**/*
+    - github.com/ProtonMail/go-crypto/**/* # A fork of golang.org/x/crypto/openpgp.
