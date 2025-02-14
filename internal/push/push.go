@@ -163,6 +163,18 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 	return repository, nil
 }
 
+func splitLargeRefSpecs(refSpecs []config.RefSpec) [][]config.RefSpec {
+	splitRefSpecs := [][]config.RefSpec{}
+	for i := 0; i < len(refSpecs); i += 25 {
+		end := i + 100
+		if end > len(refSpecs) {
+			end = len(refSpecs)
+		}
+		splitRefSpecs = append(splitRefSpecs, refSpecs[i:end])
+	}
+	return splitRefSpecs
+}
+
 func (pushService *pushService) pushGit(repository *github.Repository, initialPush bool) error {
 	remoteURL := pushService.gitURL
 	if remoteURL == "" {
@@ -210,9 +222,10 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 			deleteRefSpecs = append(deleteRefSpecs, config.RefSpec(":"+remoteReference.Name().String()))
 		}
 	}
-	refSpecBatches = append(refSpecBatches, deleteRefSpecs)
+	refSpecBatches = append(refSpecBatches, splitLargeRefSpecs(deleteRefSpecs)...)
 
-	defaultBranchRefSpec := "+refs/heads/main:refs/heads/main"
+	defaultBranchRef := "refs/heads/main"
+	defaultBranchRefSpec := "+" + defaultBranchRef + ":" + defaultBranchRef
 	if initialPush {
 		releasePathStats, err := ioutil.ReadDir(pushService.cacheDirectory.ReleasesPath())
 		if err != nil {
@@ -227,20 +240,30 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 			}
 			initialRefSpecs = append(initialRefSpecs, config.RefSpec("+"+tagReferenceName.String()+":"+tagReferenceName.String()))
 		}
-		refSpecBatches = append(refSpecBatches, initialRefSpecs)
+		refSpecBatches = append(refSpecBatches, splitLargeRefSpecs(initialRefSpecs)...)
 	} else {
 		// We've got to push the default branch on its own, so that it will be made the default branch if the repository has just been created. We then push everything else afterwards.
 		refSpecBatches = append(refSpecBatches,
 			[]config.RefSpec{
 				config.RefSpec(defaultBranchRefSpec),
 			},
-			[]config.RefSpec{
-				config.RefSpec("+refs/*:refs/*"),
-			},
 		)
+		nonDefaultRefSpecs := []config.RefSpec{}
+		localReferences, err := gitRepository.References()
+		if err != nil {
+			return errors.Wrap(err, "Error listing local references.")
+		}
+		localReferences.ForEach(func(ref *plumbing.Reference) error {
+			if ref.Name().String() != defaultBranchRef && strings.HasPrefix(ref.Name().String(), "refs/") {
+				nonDefaultRefSpecs = append(nonDefaultRefSpecs, config.RefSpec("+"+ref.Name().String()+":"+ref.Name().String()))
+			}
+			return nil
+		})
+		refSpecBatches = append(refSpecBatches, splitLargeRefSpecs(nonDefaultRefSpecs)...)
 	}
 	for _, refSpecs := range refSpecBatches {
 		if len(refSpecs) != 0 {
+			log.Debugf("Pushing refspecs %s.", refSpecs)
 			err = remote.PushContext(pushService.ctx, &git.PushOptions{
 				RefSpecs: refSpecs,
 				Auth:     credentials,
@@ -393,17 +416,17 @@ func (pushService *pushService) pushReleases() error {
 			existingAssets = append(existingAssets, assets...)
 		}
 
-		assetsPath := pushService.cacheDirectory.AssetsPath(releaseName)
-		assetPathStats, err := ioutil.ReadDir(assetsPath)
+		//assetsPath := pushService.cacheDirectory.AssetsPath(releaseName)
+		//assetPathStats, err := ioutil.ReadDir(assetsPath)
 		if err != nil {
 			return errors.Wrap(err, "Error reading release assets.")
 		}
-		for _, assetPathStat := range assetPathStats {
-			err := pushService.createOrUpdateReleaseAsset(release, existingAssets, assetPathStat)
-			if err != nil {
-				return err
-			}
-		}
+		// for _, assetPathStat := range assetPathStats {
+		// 	err := pushService.createOrUpdateReleaseAsset(release, existingAssets, assetPathStat)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// }
 	}
 
 	return nil
