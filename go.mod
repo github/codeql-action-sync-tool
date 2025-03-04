@@ -1,8 +1,6 @@
 module github.com/github/codeql-action-sync
 
-go 1.21
-
-toolchain go1.23.4
+go 1.24.0
 
 require (
 	github.com/go-git/go-git/v5 v5.13.2
