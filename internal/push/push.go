@@ -416,17 +416,17 @@ func (pushService *pushService) pushReleases() error {
 			existingAssets = append(existingAssets, assets...)
 		}
 
-		//assetsPath := pushService.cacheDirectory.AssetsPath(releaseName)
-		//assetPathStats, err := ioutil.ReadDir(assetsPath)
+		assetsPath := pushService.cacheDirectory.AssetsPath(releaseName)
+		assetPathStats, err := ioutil.ReadDir(assetsPath)
 		if err != nil {
 			return errors.Wrap(err, "Error reading release assets.")
 		}
-		// for _, assetPathStat := range assetPathStats {
-		// 	err := pushService.createOrUpdateReleaseAsset(release, existingAssets, assetPathStat)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// }
+		for _, assetPathStat := range assetPathStats {
+			err := pushService.createOrUpdateReleaseAsset(release, existingAssets, assetPathStat)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
