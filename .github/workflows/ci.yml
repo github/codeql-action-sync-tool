@@ -79,7 +79,7 @@ jobs:
       - name: Lint
         uses: golangci/golangci-lint-action@v7
         with:
-          version: v1.29
+          version: v2.1.6
 
   licensedci:
     name: Check Licenses
