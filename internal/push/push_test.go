@@ -41,6 +41,8 @@ func getTestPushService(t *testing.T, cacheDirectoryString string, githubEnterpr
 		destinationRepositoryOwner: "destination-repository-owner",
 		destinationRepositoryName:  "destination-repository-name",
 		destinationToken:           &token,
+		maxTags:                    0,              // no tag limit
+		includeBranches:            true,
 	}
 }
 

@@ -12,7 +12,9 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/go-git/go-git/v5/plumbing"
 
@@ -54,6 +56,8 @@ type pushService struct {
 	force                      bool
 	pushSSH                    bool
 	gitURL                     string
+	maxTags                    int
+	includeBranches            bool
 }
 
 func (pushService *pushService) createRepository() (*github.Repository, error) {
@@ -175,6 +179,103 @@ func splitLargeRefSpecs(refSpecs []config.RefSpec) [][]config.RefSpec {
 	return splitRefSpecs
 }
 
+// Returns the most recent tags up to maxTags limit. If maxTags is 0, returns all tags.
+func (pushService *pushService) getAllowedTagsMap(gitRepository *git.Repository) (map[string]bool, error) {
+	allowedTags := make(map[string]bool)
+	if pushService.maxTags == 0 {
+		tags, err := gitRepository.Tags()
+		if err != nil {
+			return nil, errors.Wrap(err, "Error listing tags.")
+		}
+		
+		err = tags.ForEach(func(ref *plumbing.Reference) error {
+			allowedTags[ref.Name().Short()] = true
+			return nil
+		})
+		return allowedTags, err
+	}
+
+	type tagInfo struct {
+		name string
+		time time.Time
+	}
+	
+	var tagInfos []tagInfo
+	tags, err := gitRepository.Tags()
+	if err != nil {
+		return nil, errors.Wrap(err, "Error listing tags.")
+	}
+	
+	err = tags.ForEach(func(ref *plumbing.Reference) error {
+		var tagTime time.Time
+		
+		// First try to get it as an annotated tag
+		tagObj, err := gitRepository.TagObject(ref.Hash())
+		if err == nil {
+			// It's an annotated tag, use the tag date
+			tagTime = tagObj.Tagger.When
+		} else {
+			// It's a lightweight tag, get the commit it points to
+			commit, err := gitRepository.CommitObject(ref.Hash())
+			if err != nil {
+				// If we can't get the commit, use zero time (will be filtered out)
+				tagTime = time.Time{}
+			} else {
+				tagTime = commit.Committer.When
+			}
+		}
+		
+		tagInfos = append(tagInfos, tagInfo{
+			name: ref.Name().Short(),
+			time: tagTime,
+		})
+		return nil
+	})
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	sort.Slice(tagInfos, func(i, j int) bool {
+		return tagInfos[i].time.After(tagInfos[j].time) // most recent first
+	})
+	
+	limit := pushService.maxTags
+	if limit > len(tagInfos) {
+		limit = len(tagInfos)
+	}
+	
+	for i := 0; i < limit; i++ {
+		allowedTags[tagInfos[i].name] = true
+	}
+	
+	return allowedTags, nil
+}
+
+// Determines if a reference should be included based on filtering rules:
+// - For tags, only includes those in the allowedTags set.
+// - Always includes the main branch.
+// - For other branches, includes them only if includeBranches is enabled.
+func (pushService *pushService) shouldIncludeReference(ref *plumbing.Reference, allowedTags map[string]bool) bool {
+	refName := ref.Name().String()
+	
+	if refName == "refs/heads/main" {
+		return true
+	}
+	
+	if strings.HasPrefix(refName, "refs/tags/") {
+		tagName := ref.Name().Short()
+		return allowedTags[tagName]
+	}
+	
+	if strings.HasPrefix(refName, "refs/heads/") {
+		return pushService.includeBranches
+	}
+	
+	// No other refs are currently pulled, but include any that might in the future to be safe.
+	return true
+}
+
 func (pushService *pushService) pushGit(repository *github.Repository, initialPush bool) error {
 	remoteURL := pushService.gitURL
 	if remoteURL == "" {
@@ -231,14 +332,22 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 		if err != nil {
 			return errors.Wrap(err, "Error reading releases.")
 		}
+		
+		allowedTags, err := pushService.getAllowedTagsMap(gitRepository)
+		if err != nil {
+			return err
+		}
+		
 		initialRefSpecs := []config.RefSpec{}
 		for _, releasePathStat := range releasePathStats {
-			tagReferenceName := plumbing.NewTagReferenceName(releasePathStat.Name())
-			_, err := gitRepository.Reference(tagReferenceName, true)
-			if err != nil {
-				return errors.Wrapf(err, "Error finding local tag reference %s.", tagReferenceName)
+			if allowedTags[releasePathStat.Name()] {
+				tagReferenceName := plumbing.NewTagReferenceName(releasePathStat.Name())
+				_, err := gitRepository.Reference(tagReferenceName, true)
+				if err != nil {
+					return errors.Wrapf(err, "Error finding local tag reference %s.", tagReferenceName)
+				}
+				initialRefSpecs = append(initialRefSpecs, config.RefSpec("+"+tagReferenceName.String()+":"+tagReferenceName.String()))
 			}
-			initialRefSpecs = append(initialRefSpecs, config.RefSpec("+"+tagReferenceName.String()+":"+tagReferenceName.String()))
 		}
 		refSpecBatches = append(refSpecBatches, splitLargeRefSpecs(initialRefSpecs)...)
 	} else {
@@ -248,6 +357,12 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 				config.RefSpec(defaultBranchRefSpec),
 			},
 		)
+		
+		allowedTags, err := pushService.getAllowedTagsMap(gitRepository)
+		if err != nil {
+			return err
+		}
+		
 		nonDefaultRefSpecs := []config.RefSpec{}
 		localReferences, err := gitRepository.References()
 		if err != nil {
@@ -255,7 +370,9 @@ func (pushService *pushService) pushGit(repository *github.Repository, initialPu
 		}
 		localReferences.ForEach(func(ref *plumbing.Reference) error {
 			if ref.Name().String() != defaultBranchRef && strings.HasPrefix(ref.Name().String(), "refs/") {
-				nonDefaultRefSpecs = append(nonDefaultRefSpecs, config.RefSpec("+"+ref.Name().String()+":"+ref.Name().String()))
+				if pushService.shouldIncludeReference(ref, allowedTags) {
+					nonDefaultRefSpecs = append(nonDefaultRefSpecs, config.RefSpec("+"+ref.Name().String()+":"+ref.Name().String()))
+				}
 			}
 			return nil
 		})
@@ -432,7 +549,7 @@ func (pushService *pushService) pushReleases() error {
 	return nil
 }
 
-func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, destinationURL string, destinationToken string, destinationRepository string, actionsAdminUser string, force bool, pushSSH bool, gitURL string) error {
+func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, destinationURL string, destinationToken string, destinationRepository string, actionsAdminUser string, force bool, pushSSH bool, gitURL string, maxTags int, includeBranches bool) error {
 	err := cacheDirectory.CheckOrCreateVersionFile(false, version.Version())
 	if err != nil {
 		return err
@@ -491,6 +608,8 @@ func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, des
 		force:                      force,
 		pushSSH:                    pushSSH,
 		gitURL:                     gitURL,
+		maxTags:                    maxTags,
+		includeBranches:            includeBranches,
 	}
 
 	repository, err := pushService.createRepository()
