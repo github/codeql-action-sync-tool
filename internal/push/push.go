@@ -164,9 +164,10 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 }
 
 func splitLargeRefSpecs(refSpecs []config.RefSpec) [][]config.RefSpec {
+	batchSize := 25
 	splitRefSpecs := [][]config.RefSpec{}
-	for i := 0; i < len(refSpecs); i += 25 {
-		end := i + 100
+	for i := 0; i < len(refSpecs); i += batchSize {
+		end := i + batchSize
 		if end > len(refSpecs) {
 			end = len(refSpecs)
 		}
