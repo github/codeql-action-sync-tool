@@ -25,7 +25,7 @@ From a machine with access to both GitHub.com and GitHub Enterprise Server use t
 **Optional Arguments:**
 * `--cache-dir` - A temporary directory in which to store data downloaded from GitHub.com before it is uploaded to GitHub Enterprise Server. If not specified a directory next to the sync tool will be used.
 * `--source-token` - A token to access the API of GitHub.com. This is normally not required, but can be provided if you have issues with API rate limiting. The token does not need to have any scopes.
-* `--destination-repository` - The name of the repository in which to create or update the CodeQL Action. If not specified `github/codeql-action` will be used.
+* `--destination-repository` - The `owner/repo` of the repository in which to create or update the CodeQL Action. If not specified `github/codeql-action` will be used.
 * `--actions-admin-user` - The name of the Actions admin user, which will be used if you are updating the bundled CodeQL Action. If not specified `actions-admin` will be used.
 * `--force` - By default the tool will not overwrite existing repositories. Providing this flag will allow it to.
 * `--push-ssh` - Push Git contents over SSH rather than HTTPS. To use this option you must have SSH access to your GitHub Enterprise instance configured.
