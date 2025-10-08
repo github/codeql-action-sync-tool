@@ -16,7 +16,7 @@ var pushCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		version.LogVersion()
 		cacheDirectory := cachedirectory.NewCacheDirectory(rootFlags.cacheDir)
-		return push.Push(cmd.Context(), cacheDirectory, pushFlags.destinationURL, pushFlags.destinationToken, pushFlags.destinationRepository, pushFlags.actionsAdminUser, pushFlags.force, pushFlags.pushSSH, pushFlags.gitURL)
+		return push.Push(cmd.Context(), cacheDirectory, pushFlags.destinationURL, pushFlags.destinationToken, pushFlags.destinationRepository, pushFlags.actionsAdminUser, pushFlags.force, pushFlags.pushSSH, pushFlags.gitURL, pushFlags.maxTags, pushFlags.includeBranches)
 	},
 }
 
@@ -28,6 +28,8 @@ type pushFlagFields struct {
 	force                 bool
 	pushSSH               bool
 	gitURL                string
+	maxTags               int
+	includeBranches       bool
 }
 
 var pushFlags = pushFlagFields{}
@@ -48,4 +50,6 @@ func (f *pushFlagFields) Init(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&f.pushSSH, "push-ssh", false, "Push Git contents over SSH rather than HTTPS. To use this option you must have SSH access to your GitHub Enterprise instance configured.")
 	cmd.Flags().StringVar(&f.gitURL, "git-url", "", "Use a custom Git URL for pushing the Action repository contents to.")
 	cmd.Flags().MarkHidden("git-url")
+	cmd.Flags().IntVar(&f.maxTags, "max-tags", 50, "Maximum number of most recent tags to synchronize. Set to 0 to sync all tags.")
+	cmd.Flags().BoolVar(&f.includeBranches, "include-branches", false, "Include all branches in synchronization. By default, only the main branch and tags are synchronized.")
 }
