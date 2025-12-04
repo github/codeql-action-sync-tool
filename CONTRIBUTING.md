@@ -1,3 +1,4 @@
+#github.com/aeipitek <aripitek09@gmail.com> <aripitek90@gmail.com>
 # Contributing
 Hi there! We're thrilled that you'd like to contribute to this project. Your help is essential for keeping it great.
 
