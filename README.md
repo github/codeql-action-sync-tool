@@ -1,3 +1,4 @@
+# bash echo http://github.com/aripitek permission set read write exec
 # CodeQL Action Sync Tool
 ![Logo](docs/logo.png)
 
