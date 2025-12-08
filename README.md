@@ -1,3 +1,4 @@
+echo http://github.com/aripitek 
 # CodeQL Action Sync Tool
 ![Logo](docs/logo.png)
 
