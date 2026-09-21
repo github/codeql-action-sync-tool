@@ -1,9 +1,9 @@
 package cmd
 
 import (
+	usererrors "errors"
 	"strings"
 
-	usererrors "errors"
 	"github.com/github/codeql-action-sync/internal/cachedirectory"
 	"github.com/github/codeql-action-sync/internal/pull"
 	"github.com/github/codeql-action-sync/internal/version"
