@@ -29,9 +29,6 @@ From a machine with access to both GitHub.com and GitHub Enterprise Server use t
 * `--actions-admin-user` - The name of the Actions admin user, which will be used if you are updating the bundled CodeQL Action. If not specified `actions-admin` will be used.
 * `--force` - By default the tool will not overwrite existing repositories. Providing this flag will allow it to.
 * `--push-ssh` - Push Git contents over SSH rather than HTTPS. To use this option you must have SSH access to your GitHub Enterprise instance configured.
-* `--os-include` - A comma-separated list of operating systems (e.g. `linux64,win64`) to include CodeQL bundle release assets for. Cannot be used together with `--os-exclude`. If neither is specified, assets for all operating systems are synced.
-* `--os-exclude` - A comma-separated list of operating systems (e.g. `win64,osx64`) to exclude CodeQL bundle release assets for. Cannot be used together with `--os-include`.
-* `--compression-format` - The compression format of CodeQL bundle release assets to sync, either `gz` or `zst`. If not specified, both compression formats are synced.
 
 ### I don't have a machine that can access both GitHub.com and GitHub Enterprise Server.
 From a machine with access to GitHub.com use the `./codeql-action-sync pull` command to download a copy of the CodeQL Action and bundles to a local folder.
@@ -39,9 +36,6 @@ From a machine with access to GitHub.com use the `./codeql-action-sync pull` com
 **Optional Arguments:**
 * `--cache-dir` - The directory in which to store data downloaded from GitHub.com. If not specified a directory next to the sync tool will be used.
 * `--source-token` - A token to access the API of GitHub.com. This is normally not required, but can be provided if you have issues with API rate limiting. The token does not need to have any scopes.
-* `--os-include` - A comma-separated list of operating systems (e.g. `linux64,win64`) to include CodeQL bundle release assets for. Cannot be used together with `--os-exclude`. If neither is specified, assets for all operating systems are synced.
-* `--os-exclude` - A comma-separated list of operating systems (e.g. `win64,osx64`) to exclude CodeQL bundle release assets for. Cannot be used together with `--os-include`.
-* `--compression-format` - The compression format of CodeQL bundle release assets to sync, either `gz` or `zst`. If not specified, both compression formats are synced.
 
 Next copy the sync tool and cache directory to another machine which has access to GitHub Enterprise Server.
 
