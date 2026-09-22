@@ -46,6 +46,38 @@ var releaseSomeCodeQLVersionOnV1AndV2 = github.RepositoryRelease{
 	},
 }
 
+const releaseWithMultipleOSAssetsLinux64GzContent = "linux64 gz content"
+const releaseWithMultipleOSAssetsLinux64ZstContent = "linux64 zst content"
+const releaseWithMultipleOSAssetsWin64GzContent = "win64 gz content"
+const releaseWithMultipleOSAssetsCliVersionContent = "1.2.3"
+
+var releaseWithMultipleOSAssets = github.RepositoryRelease{
+	TagName: github.String("some-codeql-version-on-main"),
+	Name:    github.String("some-codeql-version-on-main"),
+	Assets: []*github.ReleaseAsset{
+		&github.ReleaseAsset{
+			ID:   github.Int64(10),
+			Name: github.String("codeql-bundle-linux64.tar.gz"),
+			Size: github.Int(len(releaseWithMultipleOSAssetsLinux64GzContent)),
+		},
+		&github.ReleaseAsset{
+			ID:   github.Int64(11),
+			Name: github.String("codeql-bundle-linux64.tar.zst"),
+			Size: github.Int(len(releaseWithMultipleOSAssetsLinux64ZstContent)),
+		},
+		&github.ReleaseAsset{
+			ID:   github.Int64(12),
+			Name: github.String("codeql-bundle-win64.tar.gz"),
+			Size: github.Int(len(releaseWithMultipleOSAssetsWin64GzContent)),
+		},
+		&github.ReleaseAsset{
+			ID:   github.Int64(13),
+			Name: github.String("cli-version-1.2.3.txt"),
+			Size: github.Int(len(releaseWithMultipleOSAssetsCliVersionContent)),
+		},
+	},
+}
+
 func getTestPullService(t *testing.T, temporaryDirectory string, gitCloneURL string, githubURL string) pullService {
 	cacheDirectory := cachedirectory.NewCacheDirectory(temporaryDirectory)
 	var githubDotComClient *github.Client
@@ -132,6 +164,44 @@ func TestPullGitNotFreshWithChanges(t *testing.T) {
 	})
 }
 
+func TestShouldDownloadAsset(t *testing.T) {
+	cases := []struct {
+		name                   string
+		assetName              string
+		assetOSIncludes        []string
+		assetOSExcludes        []string
+		assetCompressionFormat string
+		expected               bool
+	}{
+		{"no filters, gz asset", "codeql-bundle-linux64.tar.gz", nil, nil, "", true},
+		{"no filters, zst asset", "codeql-bundle-linux64.tar.zst", nil, nil, "", true},
+		{"no filters, non-OS asset", "cli-version-1.2.3.txt", nil, nil, "", true},
+		{"os-include matches", "codeql-bundle-linux64.tar.gz", []string{"linux64", "win64"}, nil, "", true},
+		{"os-include does not match", "codeql-bundle-osx64.tar.gz", []string{"linux64", "win64"}, nil, "", false},
+		{"os-include ignores non-OS asset", "cli-version-1.2.3.txt", []string{"linux64"}, nil, "", true},
+		{"os-exclude matches", "codeql-bundle-win64.tar.gz", nil, []string{"win64"}, "", false},
+		{"os-exclude does not match", "codeql-bundle-linux64.tar.gz", nil, []string{"win64"}, "", true},
+		{"os-exclude ignores non-OS asset", "cli-version-1.2.3.txt", nil, []string{"linux64"}, "", true},
+		{"compression format matches", "codeql-bundle-linux64.tar.zst", nil, nil, "zst", true},
+		{"compression format does not match", "codeql-bundle-linux64.tar.gz", nil, nil, "zst", false},
+		{"compression format ignores non-OS asset", "cli-version-1.2.3.txt", nil, nil, "zst", true},
+		{"checksum file follows same rules as its asset", "codeql-bundle-linux64.tar.gz.checksum.txt", nil, nil, "zst", false},
+		{"os-include and compression format combined", "codeql-bundle-linux-arm64.tar.gz", []string{"linux-arm64"}, nil, "gz", true},
+		{"os-include and compression format combined, format mismatch", "codeql-bundle-linux-arm64.tar.zst", []string{"linux-arm64"}, nil, "gz", false},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			pullService := pullService{
+				assetOSIncludes:        testCase.assetOSIncludes,
+				assetOSExcludes:        testCase.assetOSExcludes,
+				assetCompressionFormat: testCase.assetCompressionFormat,
+			}
+			require.Equal(t, testCase.expected, pullService.shouldDownloadAsset(testCase.assetName))
+		})
+	}
+}
+
 func TestFindRelevantReleases(t *testing.T) {
 	temporaryDirectory := test.CreateTemporaryDirectory(t)
 	pullService := getTestPullService(t, temporaryDirectory, initialActionRepository, "")
@@ -189,4 +259,40 @@ func TestPullReleases(t *testing.T) {
 
 	test.RequireFileHasContent(t, releaseSomeCodeQLVersionOnMainContent, pullService.cacheDirectory.AssetPath("some-codeql-version-on-main", "codeql-bundle.tar.gz"))
 	test.RequireFileHasContent(t, releaseSomeCodeQLVersionOnV1AndV2Content, pullService.cacheDirectory.AssetPath("some-codeql-version-on-v1-and-v2", "codeql-bundle.tar.gz"))
+}
+
+func TestPullReleasesWithOSAndCompressionFilters(t *testing.T) {
+	temporaryDirectory := test.CreateTemporaryDirectory(t)
+	githubTestServer, githubURL := test.GetTestHTTPServer(t)
+	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/tags/some-codeql-version-on-main", func(response http.ResponseWriter, request *http.Request) {
+		test.ServeHTTPResponseFromObject(t, releaseWithMultipleOSAssets, response)
+	}).Methods("GET")
+	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/assets/10", func(response http.ResponseWriter, request *http.Request) {
+		test.ServeHTTPResponseFromString(t, releaseWithMultipleOSAssetsLinux64GzContent, response)
+	}).Methods("GET").Headers("accept", "application/octet-stream")
+	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/assets/13", func(response http.ResponseWriter, request *http.Request) {
+		test.ServeHTTPResponseFromString(t, releaseWithMultipleOSAssetsCliVersionContent, response)
+	}).Methods("GET").Headers("accept", "application/octet-stream")
+	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/tags/some-codeql-version-on-v1-and-v2", func(response http.ResponseWriter, request *http.Request) {
+		test.ServeHTTPResponseFromObject(t, releaseSomeCodeQLVersionOnV1AndV2, response)
+	}).Methods("GET")
+	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/assets/2", func(response http.ResponseWriter, request *http.Request) {
+		test.ServeHTTPResponseFromString(t, releaseSomeCodeQLVersionOnV1AndV2Content, response)
+	}).Methods("GET").Headers("accept", "application/octet-stream")
+
+	pullService := getTestPullService(t, temporaryDirectory, initialActionRepository, githubURL)
+	pullService.assetOSIncludes = []string{"linux64"}
+	pullService.assetCompressionFormat = "gz"
+	err := pullService.pullGit(true)
+	require.NoError(t, err)
+	err = pullService.pullReleases()
+	require.NoError(t, err)
+
+	// The included OS + compression format asset, and the non-OS-specific asset, should be downloaded.
+	test.RequireFileHasContent(t, releaseWithMultipleOSAssetsLinux64GzContent, pullService.cacheDirectory.AssetPath("some-codeql-version-on-main", "codeql-bundle-linux64.tar.gz"))
+	test.RequireFileHasContent(t, releaseWithMultipleOSAssetsCliVersionContent, pullService.cacheDirectory.AssetPath("some-codeql-version-on-main", "cli-version-1.2.3.txt"))
+
+	// The other OS/compression format combinations should have been skipped entirely.
+	require.NoFileExists(t, pullService.cacheDirectory.AssetPath("some-codeql-version-on-main", "codeql-bundle-linux64.tar.zst"))
+	require.NoFileExists(t, pullService.cacheDirectory.AssetPath("some-codeql-version-on-main", "codeql-bundle-win64.tar.gz"))
 }

@@ -36,12 +36,60 @@ var relevantReferences = regexp.MustCompile("^refs/(heads|tags)/(main|v\\d+)$")
 
 const defaultConfigurationPath = "src/defaults.json"
 
+// Matches release asset names like "codeql-bundle-linux64.tar.gz",
+// "codeql-bundle-linux-arm64.tar.zst" or "codeql-bundle-osx64.tar.gz.checksum.txt".
+// The first capture group is the OS identifier and the second is the compression format.
+var releaseAssetNameRegexp = regexp.MustCompile(`^codeql-bundle-([a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*)\.tar\.(gz|zst)(?:\.checksum\.txt)?$`)
+
 type pullService struct {
-	ctx                context.Context
-	cacheDirectory     cachedirectory.CacheDirectory
-	gitCloneURL        string
-	githubDotComClient *github.Client
-	sourceToken        string
+	ctx                    context.Context
+	cacheDirectory         cachedirectory.CacheDirectory
+	gitCloneURL            string
+	githubDotComClient     *github.Client
+	sourceToken            string
+	assetOSIncludes        []string
+	assetOSExcludes        []string
+	assetCompressionFormat string
+}
+
+// shouldDownloadAsset determines whether a release asset should be downloaded, based on the
+// OS include/exclude lists and compression format configured on the pullService. Assets whose
+// name does not match the "codeql-bundle-<os>.tar.<gz|zst>" naming convention (for example
+// "cli-version-X.txt") are not OS- or compression-specific, and are always downloaded.
+func (pullService *pullService) shouldDownloadAsset(assetName string) bool {
+	matches := releaseAssetNameRegexp.FindStringSubmatch(assetName)
+	if matches == nil {
+		return true
+	}
+	assetOS := matches[1]
+	assetCompressionFormat := matches[2]
+
+	if len(pullService.assetOSIncludes) > 0 {
+		included := false
+		for _, os := range pullService.assetOSIncludes {
+			if os == assetOS {
+				included = true
+				break
+			}
+		}
+		if !included {
+			return false
+		}
+	}
+
+	if len(pullService.assetOSExcludes) > 0 {
+		for _, os := range pullService.assetOSExcludes {
+			if os == assetOS {
+				return false
+			}
+		}
+	}
+
+	if pullService.assetCompressionFormat != "" && pullService.assetCompressionFormat != assetCompressionFormat {
+		return false
+	}
+
+	return true
 }
 
 func (pullService *pullService) pullGit(fresh bool) error {
@@ -215,6 +263,10 @@ func (pullService *pullService) pullReleases() error {
 			return errors.Wrap(err, "Error creating assets directory.")
 		}
 		for _, asset := range release.Assets {
+			if !pullService.shouldDownloadAsset(asset.GetName()) {
+				log.Debugf("Skipping asset %s due to OS/compression format filters.", asset.GetName())
+				continue
+			}
 			log.Debugf("Downloading asset %s...", asset.GetName())
 			downloadPath := pullService.cacheDirectory.AssetPath(releaseTag, asset.GetName())
 			downloadPathStat, err := os.Stat(downloadPath)
@@ -260,7 +312,7 @@ func (pullService *pullService) pullReleases() error {
 	return nil
 }
 
-func Pull(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, sourceToken string, sourceURL string) error {
+func Pull(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, sourceToken string, sourceURL string, assetOSIncludes []string, assetOSExcludes []string, assetCompressionFormat string) error {
 	err := cacheDirectory.CheckOrCreateVersionFile(true, version.Version())
 	if err != nil {
 		return err
@@ -283,11 +335,14 @@ func Pull(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, sou
 	}
 
 	pullService := pullService{
-		ctx:                ctx,
-		cacheDirectory:     cacheDirectory,
-		gitCloneURL:        sourceURL,
-		githubDotComClient: github.NewClient(tokenClient),
-		sourceToken:        sourceToken,
+		ctx:                    ctx,
+		cacheDirectory:         cacheDirectory,
+		gitCloneURL:            sourceURL,
+		githubDotComClient:     github.NewClient(tokenClient),
+		sourceToken:            sourceToken,
+		assetOSIncludes:        assetOSIncludes,
+		assetOSExcludes:        assetOSExcludes,
+		assetCompressionFormat: assetCompressionFormat,
 	}
 
 	err = pullService.pullGit(false)
