@@ -444,6 +444,10 @@ func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, des
 	}
 
 	destinationURL = strings.TrimRight(destinationURL, "/")
+	if !strings.Contains(destinationURL, "://") {
+		log.Warnf("No protocol scheme specified in --destination-url %q, assuming https://.", destinationURL)
+		destinationURL = "https://" + destinationURL
+	}
 	token := oauth2.Token{AccessToken: destinationToken}
 	tokenSource := oauth2.StaticTokenSource(
 		&token,

@@ -9,6 +9,8 @@ import (
 	"github.com/github/codeql-action-sync/internal/cachedirectory"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/require"
 
 	"github.com/github/codeql-action-sync/test"
@@ -200,6 +202,36 @@ func TestShouldDownloadAsset(t *testing.T) {
 			require.Equal(t, testCase.expected, pullService.shouldDownloadAsset(testCase.assetName))
 		})
 	}
+}
+
+func TestWarnOnUnmatchedOSFilters(t *testing.T) {
+	hook := logtest.NewGlobal()
+	defer hook.Reset()
+
+	pullService := pullService{
+		assetOSIncludes: []string{"linux", "win64"},
+		seenAssetOSs:    map[string]bool{"win64": true, "osx64": true},
+	}
+	pullService.warnOnUnmatchedOSFilters()
+
+	require.Len(t, hook.Entries, 1)
+	require.Equal(t, log.WarnLevel, hook.Entries[0].Level)
+	require.Contains(t, hook.Entries[0].Message, `The --os-include value "linux" did not match any release asset`)
+	require.Contains(t, hook.Entries[0].Message, "osx64, win64")
+}
+
+func TestWarnOnUnmatchedOSFiltersNoWarningWhenAllMatch(t *testing.T) {
+	hook := logtest.NewGlobal()
+	defer hook.Reset()
+
+	pullService := pullService{
+		assetOSIncludes: []string{"linux64"},
+		assetOSExcludes: []string{"win64"},
+		seenAssetOSs:    map[string]bool{"linux64": true, "win64": true, "osx64": true},
+	}
+	pullService.warnOnUnmatchedOSFilters()
+
+	require.Empty(t, hook.Entries)
 }
 
 func TestFindRelevantReleases(t *testing.T) {

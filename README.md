@@ -19,7 +19,7 @@ If your GitHub Enterprise Server instance is on a completely isolated network wh
 From a machine with access to both GitHub.com and GitHub Enterprise Server use the `./codeql-action-sync sync` command to copy the CodeQL Action and bundles.
 
 **Required Arguments:**
-* `--destination-url` - The URL of the GitHub Enterprise Server instance to push the Action to.
+* `--destination-url` - The URL of the GitHub Enterprise Server instance to push the Action to. If no protocol scheme is included (e.g. you pass `github.example.com` instead of `https://github.example.com`), `https://` is assumed.
 * `--destination-token` - A [Personal Access Token](https://docs.github.com/en/enterprise/user/github/authenticating-to-github/creating-a-personal-access-token) for the destination GitHub Enterprise Server instance. If the destination repository is in an organization that does not yet exist or that you are not an owner of, your token will need to have the `site_admin` scope in order to create the organization or update the repository in it. The organization can also be created manually or an existing organization that you own can be used, in which case the `repo` and `workflow` scopes are sufficient. The token can also be provided by setting the `CODEQL_ACTION_SYNC_TOOL_DESTINATION_TOKEN` environment variable.
 
 **Optional Arguments:**
@@ -29,8 +29,8 @@ From a machine with access to both GitHub.com and GitHub Enterprise Server use t
 * `--actions-admin-user` - The name of the Actions admin user, which will be used if you are updating the bundled CodeQL Action. If not specified `actions-admin` will be used.
 * `--force` - By default the tool will not overwrite existing repositories. Providing this flag will allow it to.
 * `--push-ssh` - Push Git contents over SSH rather than HTTPS. To use this option you must have SSH access to your GitHub Enterprise instance configured.
-* `--os-include` - A comma-separated list of operating systems (e.g. `linux64,win64`) to include CodeQL bundle release assets for. Cannot be used together with `--os-exclude`. If neither is specified, assets for all operating systems are synced.
-* `--os-exclude` - A comma-separated list of operating systems (e.g. `win64,osx64`) to exclude CodeQL bundle release assets for. Cannot be used together with `--os-include`.
+* `--os-include` - A comma-separated list of operating systems to include CodeQL bundle release assets for. Cannot be used together with `--os-exclude`. If neither is specified, assets for all operating systems are synced. Values must exactly match the OS identifier embedded in the asset name (for example `linux64`, `linux-arm64`, `osx64`, `win64` — not shorthand like `linux` or `win`). If a value does not match any asset in the releases being pulled, a warning listing the OS identifiers that were actually found is logged.
+* `--os-exclude` - A comma-separated list of operating systems to exclude CodeQL bundle release assets for. Cannot be used together with `--os-include`. Values must exactly match the OS identifier embedded in the asset name (for example `linux64`, `linux-arm64`, `osx64`, `win64`).
 * `--compression-format` - The compression format of CodeQL bundle release assets to sync, either `gz` or `zst`. If not specified, both compression formats are synced.
 
 ### I don't have a machine that can access both GitHub.com and GitHub Enterprise Server.
@@ -39,8 +39,8 @@ From a machine with access to GitHub.com use the `./codeql-action-sync pull` com
 **Optional Arguments:**
 * `--cache-dir` - The directory in which to store data downloaded from GitHub.com. If not specified a directory next to the sync tool will be used.
 * `--source-token` - A token to access the API of GitHub.com. This is normally not required, but can be provided if you have issues with API rate limiting. The token does not need to have any scopes.
-* `--os-include` - A comma-separated list of operating systems (e.g. `linux64,win64`) to include CodeQL bundle release assets for. Cannot be used together with `--os-exclude`. If neither is specified, assets for all operating systems are synced.
-* `--os-exclude` - A comma-separated list of operating systems (e.g. `win64,osx64`) to exclude CodeQL bundle release assets for. Cannot be used together with `--os-include`.
+* `--os-include` - A comma-separated list of operating systems to include CodeQL bundle release assets for. Cannot be used together with `--os-exclude`. If neither is specified, assets for all operating systems are synced. Values must exactly match the OS identifier embedded in the asset name (for example `linux64`, `linux-arm64`, `osx64`, `win64` — not shorthand like `linux` or `win`). If a value does not match any asset in the releases being pulled, a warning listing the OS identifiers that were actually found is logged.
+* `--os-exclude` - A comma-separated list of operating systems to exclude CodeQL bundle release assets for. Cannot be used together with `--os-include`. Values must exactly match the OS identifier embedded in the asset name (for example `linux64`, `linux-arm64`, `osx64`, `win64`).
 * `--compression-format` - The compression format of CodeQL bundle release assets to sync, either `gz` or `zst`. If not specified, both compression formats are synced.
 
 Next copy the sync tool and cache directory to another machine which has access to GitHub Enterprise Server.
@@ -48,7 +48,7 @@ Next copy the sync tool and cache directory to another machine which has access 
 Now use the `./codeql-action-sync push` command to upload the CodeQL Action and bundles to GitHub Enterprise Server.
 
 **Required Arguments:**
-* `--destination-url` - The URL of the GitHub Enterprise Server instance to push the Action to.
+* `--destination-url` - The URL of the GitHub Enterprise Server instance to push the Action to. If no protocol scheme is included (e.g. you pass `github.example.com` instead of `https://github.example.com`), `https://` is assumed.
 * `--destination-token` - A [Personal Access Token](https://docs.github.com/en/enterprise/user/github/authenticating-to-github/creating-a-personal-access-token) for the destination GitHub Enterprise Server instance. If the destination repository is in an organization that does not yet exist or that you are not an owner of, your token will need to have the `site_admin` scope in order to create the organization or update the repository in it. The organization can also be created manually or an existing organization that you own can be used, in which case the `repo` and `workflow` scopes are sufficient. The token can also be provided by setting the `CODEQL_ACTION_SYNC_TOOL_DESTINATION_TOKEN` environment variable.
 
 **Optional Arguments:**

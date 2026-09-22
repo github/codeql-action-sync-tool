@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -50,6 +51,7 @@ type pullService struct {
 	assetOSIncludes        []string
 	assetOSExcludes        []string
 	assetCompressionFormat string
+	seenAssetOSs           map[string]bool
 }
 
 // shouldDownloadAsset determines whether a release asset should be downloaded, based on the
@@ -63,6 +65,11 @@ func (pullService *pullService) shouldDownloadAsset(assetName string) bool {
 	}
 	assetOS := matches[1]
 	assetCompressionFormat := matches[2]
+
+	if pullService.seenAssetOSs == nil {
+		pullService.seenAssetOSs = map[string]bool{}
+	}
+	pullService.seenAssetOSs[assetOS] = true
 
 	if len(pullService.assetOSIncludes) > 0 {
 		included := false
@@ -309,7 +316,34 @@ func (pullService *pullService) pullReleases() error {
 			}
 		}
 	}
+	pullService.warnOnUnmatchedOSFilters()
 	return nil
+}
+
+// warnOnUnmatchedOSFilters logs a warning if none of the configured --os-include or --os-exclude
+// values matched the OS identifier of any release asset that was actually encountered. This
+// helps surface typos or incorrect assumptions about asset OS identifiers (for example passing
+// "linux" when the real identifiers are "linux64"/"linux-arm64"), which would otherwise silently
+// filter out every OS-specific asset without any indication of why.
+func (pullService *pullService) warnOnUnmatchedOSFilters() {
+	seenList := make([]string, 0, len(pullService.seenAssetOSs))
+	for os := range pullService.seenAssetOSs {
+		seenList = append(seenList, os)
+	}
+	sort.Strings(seenList)
+
+	checkUnmatched := func(flagName string, values []string) {
+		for _, value := range values {
+			if !pullService.seenAssetOSs[value] {
+				log.Warnf(
+					"The %s value %q did not match any release asset. The OS identifiers found in the releases pulled were: %s.",
+					flagName, value, strings.Join(seenList, ", "),
+				)
+			}
+		}
+	}
+	checkUnmatched("--os-include", pullService.assetOSIncludes)
+	checkUnmatched("--os-exclude", pullService.assetOSExcludes)
 }
 
 func Pull(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, sourceToken string, sourceURL string, assetOSIncludes []string, assetOSExcludes []string, assetCompressionFormat string) error {
