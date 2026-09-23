@@ -9,3 +9,7 @@ ignored:
   go:
     - golang.org/x/**/*
     - github.com/ProtonMail/go-crypto/**/* # A fork of golang.org/x/crypto/openpgp.
+
+reviewed:
+  go:
+    - github.com/cloudflare/circl/**/* # BSD-3-Clause; licensed classifies the combined license text as other.
