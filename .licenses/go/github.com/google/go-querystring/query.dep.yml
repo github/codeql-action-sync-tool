@@ -1,12 +1,12 @@
 ---
 name: github.com/google/go-querystring/query
-version: v1.0.0
+version: v1.2.0
 type: go
 summary: Package query implements encoding of structs into URL query parameters.
 homepage: https://godoc.org/github.com/google/go-querystring/query
 license: bsd-3-clause
 licenses:
-- sources: go-querystring@v1.0.0/LICENSE
+- sources: go-querystring/LICENSE
   text: |
     Copyright (c) 2013 Google. All rights reserved.
 
@@ -35,8 +35,4 @@ licenses:
     THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
     OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-- sources: go-querystring@v1.0.0/README.md
-  text: |-
-    This library is distributed under the BSD-style license found in the [LICENSE](./LICENSE)
-    file.
 notices: []

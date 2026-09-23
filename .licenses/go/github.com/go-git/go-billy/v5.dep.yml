@@ -1,9 +1,9 @@
 ---
 name: github.com/go-git/go-billy/v5
-version: v5.6.2
+version: v5.9.1
 type: go
 summary: 
-homepage: https://pkg.go.dev/github.com/go-git/go-billy/v5
+homepage: https://godoc.org/github.com/go-git/go-billy/v5
 license: apache-2.0
 licenses:
 - sources: LICENSE

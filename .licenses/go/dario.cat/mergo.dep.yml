@@ -1,9 +1,9 @@
 ---
 name: dario.cat/mergo
-version: v1.0.0
+version: v1.0.2
 type: go
 summary: A helper to merge structs and maps in Golang.
-homepage: https://pkg.go.dev/dario.cat/mergo
+homepage: https://godoc.org/dario.cat/mergo
 license: bsd-3-clause
 licenses:
 - sources: LICENSE
