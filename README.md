@@ -19,7 +19,7 @@ If your GitHub Enterprise Server instance is on a completely isolated network wh
 From a machine with access to both GitHub.com and GitHub Enterprise Server use the `./codeql-action-sync sync` command to copy the CodeQL Action and bundles.
 
 **Required Arguments:**
-* `--destination-url` - The root URL of the GitHub Enterprise Server instance, for example `https://github.example.com`. Do not include an API path such as `/api/v3` or surrounding whitespace.
+* `--destination-url` - The root URL of the GitHub Enterprise Server instance, for example `https://github.example.com`. Do not include an API path such as `/api/v3`, a query, a fragment, or surrounding whitespace.
 * `--destination-token` - A [Personal Access Token](https://docs.github.com/en/enterprise/user/github/authenticating-to-github/creating-a-personal-access-token) for the destination GitHub Enterprise Server instance. If the destination repository is in an organization that does not yet exist or that you are not an owner of, your token will need to have the `site_admin` scope in order to create the organization or update the repository in it. The organization can also be created manually or an existing organization that you own can be used, in which case the `repo` and `workflow` scopes are sufficient. The token can also be provided by setting the `CODEQL_ACTION_SYNC_TOOL_DESTINATION_TOKEN` environment variable.
 
 **Optional Arguments:**
@@ -86,7 +86,7 @@ Next copy the sync tool and cache directory to another machine which has access 
 Now use the `./codeql-action-sync push` command to upload the CodeQL Action and bundles to GitHub Enterprise Server.
 
 **Required Arguments:**
-* `--destination-url` - The root URL of the GitHub Enterprise Server instance, for example `https://github.example.com`. Do not include an API path such as `/api/v3` or surrounding whitespace.
+* `--destination-url` - The root URL of the GitHub Enterprise Server instance, for example `https://github.example.com`. Do not include an API path such as `/api/v3`, a query, a fragment, or surrounding whitespace.
 * `--destination-token` - A [Personal Access Token](https://docs.github.com/en/enterprise/user/github/authenticating-to-github/creating-a-personal-access-token) for the destination GitHub Enterprise Server instance. If the destination repository is in an organization that does not yet exist or that you are not an owner of, your token will need to have the `site_admin` scope in order to create the organization or update the repository in it. The organization can also be created manually or an existing organization that you own can be used, in which case the `repo` and `workflow` scopes are sufficient. The token can also be provided by setting the `CODEQL_ACTION_SYNC_TOOL_DESTINATION_TOKEN` environment variable.
 
 **Optional Arguments:**

@@ -532,8 +532,8 @@ func ValidateArguments(destinationURL string, destinationToken string, destinati
 	if err != nil || (parsedDestinationURL.Scheme != "http" && parsedDestinationURL.Scheme != "https") || parsedDestinationURL.Host == "" {
 		return usererrors.New("The destination URL must be a full HTTP or HTTPS URL, for example `https://github.example.com`.")
 	}
-	if strings.TrimRight(parsedDestinationURL.EscapedPath(), "/") != "" {
-		return usererrors.New("The destination URL must be the root URL of the GitHub Enterprise instance, without a path.")
+	if strings.TrimRight(parsedDestinationURL.EscapedPath(), "/") != "" || parsedDestinationURL.RawQuery != "" || parsedDestinationURL.Fragment != "" {
+		return usererrors.New("The destination URL must be the root URL of the GitHub Enterprise instance, without a path, query, or fragment.")
 	}
 	if strings.TrimSpace(destinationToken) == "" {
 		return usererrors.New("The destination token cannot be empty.")
