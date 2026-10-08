@@ -127,6 +127,97 @@ func TestCreateOrganizationAndRepositoryWhenOrganizationIsOwner(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func serveGitHubAppForbiddenResponse(t *testing.T, response http.ResponseWriter) {
+	response.WriteHeader(http.StatusForbidden)
+	test.ServeHTTPResponseFromString(t, `{"message": "Resource not accessible by integration"}`, response)
+}
+
+func handleCurrentUserForGitHubAppAuth(t *testing.T, githubTestServer *mux.Router) {
+	githubTestServer.HandleFunc("/api/v3/user", func(response http.ResponseWriter, request *http.Request) {
+		t.Error("The current user should not be requested when using GitHub App authentication.")
+		serveGitHubAppForbiddenResponse(t, response)
+	}).Methods("GET")
+}
+
+func TestCreateRepositoryWithGitHubAppAuth(t *testing.T) {
+	temporaryDirectory := test.CreateTemporaryDirectory(t)
+	githubTestServer, githubEnterpriseURL := test.GetTestHTTPServer(t)
+	pushService := getTestPushService(t, temporaryDirectory, githubEnterpriseURL)
+	pushService.githubAppAuth = true
+	handleCurrentUserForGitHubAppAuth(t, githubTestServer)
+	githubTestServer.HandleFunc("/api/v3/repos/destination-repository-owner/destination-repository-name", func(response http.ResponseWriter, request *http.Request) {
+		response.WriteHeader(http.StatusNotFound)
+	}).Methods("GET")
+	githubTestServer.HandleFunc("/api/v3/orgs/destination-repository-owner/repos", func(response http.ResponseWriter, request *http.Request) {
+		test.ServeHTTPResponseFromObject(t, github.Repository{}, response)
+	}).Methods("POST")
+	_, err := pushService.createRepository()
+	require.NoError(t, err)
+	require.Equal(t, "token", pushService.destinationToken.AccessToken)
+}
+
+func TestUpdateRepositoryWithGitHubAppAuth(t *testing.T) {
+	temporaryDirectory := test.CreateTemporaryDirectory(t)
+	githubTestServer, githubEnterpriseURL := test.GetTestHTTPServer(t)
+	pushService := getTestPushService(t, temporaryDirectory, githubEnterpriseURL)
+	pushService.githubAppAuth = true
+	handleCurrentUserForGitHubAppAuth(t, githubTestServer)
+	githubTestServer.HandleFunc("/api/v3/repos/destination-repository-owner/destination-repository-name", func(response http.ResponseWriter, request *http.Request) {
+		test.ServeHTTPResponseFromObject(t, github.Repository{Homepage: github.String(repositoryHomepage)}, response)
+	}).Methods("GET")
+	githubTestServer.HandleFunc("/api/v3/repos/destination-repository-owner/destination-repository-name", func(response http.ResponseWriter, request *http.Request) {
+		test.ServeHTTPResponseFromObject(t, github.Repository{}, response)
+	}).Methods("PATCH")
+	_, err := pushService.createRepository()
+	require.NoError(t, err)
+	require.Equal(t, "token", pushService.destinationToken.AccessToken)
+}
+
+func TestCreateRepositoryWithGitHubAppAuthWithoutPermission(t *testing.T) {
+	temporaryDirectory := test.CreateTemporaryDirectory(t)
+	githubTestServer, githubEnterpriseURL := test.GetTestHTTPServer(t)
+	pushService := getTestPushService(t, temporaryDirectory, githubEnterpriseURL)
+	pushService.githubAppAuth = true
+	handleCurrentUserForGitHubAppAuth(t, githubTestServer)
+	githubTestServer.HandleFunc("/api/v3/repos/destination-repository-owner/destination-repository-name", func(response http.ResponseWriter, request *http.Request) {
+		response.WriteHeader(http.StatusNotFound)
+	}).Methods("GET")
+	githubTestServer.HandleFunc("/api/v3/orgs/destination-repository-owner/repos", func(response http.ResponseWriter, request *http.Request) {
+		serveGitHubAppForbiddenResponse(t, response)
+	}).Methods("POST")
+	_, err := pushService.createRepository()
+	require.ErrorContains(t, err, errorGitHubAppAccess)
+	require.ErrorContains(t, err, "Resource not accessible by integration")
+}
+
+func TestUpdateRepositoryWithGitHubAppAuthWithoutAccess(t *testing.T) {
+	temporaryDirectory := test.CreateTemporaryDirectory(t)
+	githubTestServer, githubEnterpriseURL := test.GetTestHTTPServer(t)
+	pushService := getTestPushService(t, temporaryDirectory, githubEnterpriseURL)
+	pushService.githubAppAuth = true
+	handleCurrentUserForGitHubAppAuth(t, githubTestServer)
+	githubTestServer.HandleFunc("/api/v3/repos/destination-repository-owner/destination-repository-name", func(response http.ResponseWriter, request *http.Request) {
+		test.ServeHTTPResponseFromObject(t, github.Repository{Homepage: github.String(repositoryHomepage)}, response)
+	}).Methods("GET")
+	githubTestServer.HandleFunc("/api/v3/repos/destination-repository-owner/destination-repository-name", func(response http.ResponseWriter, request *http.Request) {
+		response.WriteHeader(http.StatusNotFound)
+	}).Methods("PATCH")
+	_, err := pushService.createRepository()
+	require.ErrorContains(t, err, errorGitHubAppAccess)
+	require.NotContains(t, err.Error(), "scope")
+}
+
+func TestCreateRepositoryWithGitHubAppTokenWithoutGitHubAppAuth(t *testing.T) {
+	temporaryDirectory := test.CreateTemporaryDirectory(t)
+	githubTestServer, githubEnterpriseURL := test.GetTestHTTPServer(t)
+	pushService := getTestPushService(t, temporaryDirectory, githubEnterpriseURL)
+	githubTestServer.HandleFunc("/api/v3/user", func(response http.ResponseWriter, request *http.Request) {
+		serveGitHubAppForbiddenResponse(t, response)
+	}).Methods("GET")
+	_, err := pushService.createRepository()
+	require.ErrorContains(t, err, errorUseGitHubAppAuth)
+}
+
 func TestPushGit(t *testing.T) {
 	temporaryDirectory := test.CreateTemporaryDirectory(t)
 	destinationPath := path.Join(temporaryDirectory, "target")

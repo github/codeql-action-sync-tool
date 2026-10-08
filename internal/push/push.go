@@ -36,6 +36,8 @@ const repositoryHomepage = "https://github.com/github/codeql-action-sync-tool/"
 
 const errorAlreadyExists = "The destination repository already exists, but it was not created with the CodeQL Action sync tool. If you are sure you want to push the CodeQL Action to it, re-run this command with the `--force` flag."
 const errorInvalidDestinationToken = "The destination token you've provided is not valid."
+const errorUseGitHubAppAuth = "If you are using a GitHub App installation token, re-run this command with the `--github-app-auth` flag."
+const errorGitHubAppAccess = "When using GitHub App authentication, the destination organization must already exist, the GitHub App must be installed on it with access to the destination repository, and the GitHub App must have read and write access to administration, contents and workflows."
 
 const enterpriseAPIPath = "/api/v3"
 const enterpriseUploadsPath = "/api/uploads"
@@ -54,6 +56,74 @@ type pushService struct {
 	force                      bool
 	pushSSH                    bool
 	gitURL                     string
+	githubAppAuth              bool
+}
+
+func (pushService *pushService) isGitHubAppAccessError(response *github.Response) bool {
+	return pushService.githubAppAuth && response != nil && (response.StatusCode == http.StatusForbidden || response.StatusCode == http.StatusNotFound)
+}
+
+// getDestinationOrganization returns the organization to create the destination repository in, or an empty string if it should be created under the current user.
+// If necessary, it creates the organization or switches the destination token to an impersonation token for the Actions admin user.
+func (pushService *pushService) getDestinationOrganization(minimumRepositoryScope string) (string, error) {
+	if pushService.githubAppAuth {
+		// GitHub App installation tokens have no user context, so we can't look up the current user, create organizations or impersonate the Actions admin user.
+		// The repository must therefore be in an existing organization that the GitHub App is installed on.
+		log.Debugf("Using GitHub App authentication. The destination repository will be created in the existing %s organization.", pushService.destinationRepositoryOwner)
+		return pushService.destinationRepositoryOwner, nil
+	}
+
+	user, response, err := pushService.githubEnterpriseClient.Users.Get(pushService.ctx, "")
+	if err != nil {
+		if response != nil && response.StatusCode == http.StatusUnauthorized {
+			return "", usererrors.New(errorInvalidDestinationToken)
+		}
+		if response != nil && response.StatusCode == http.StatusForbidden {
+			return "", githubapiutil.EnrichResponseError(response, err, "Error getting current user. "+errorUseGitHubAppAuth)
+		}
+		return "", githubapiutil.EnrichResponseError(response, err, "Error getting current user.")
+	}
+
+	// When creating a repository we can either create it in a named organization or under the current user (represented in go-github by an empty string).
+	destinationOrganization := ""
+	if pushService.destinationRepositoryOwner != user.GetLogin() {
+		destinationOrganization = pushService.destinationRepositoryOwner
+	}
+
+	if destinationOrganization != "" {
+		_, response, err := pushService.githubEnterpriseClient.Organizations.Get(pushService.ctx, pushService.destinationRepositoryOwner)
+		if err != nil && (response == nil || response.StatusCode != http.StatusNotFound) {
+			return "", githubapiutil.EnrichResponseError(response, err, "Error checking if destination organization exists.")
+		}
+		if response != nil && response.StatusCode == http.StatusNotFound {
+			log.Debugf("The organization %s does not exist. Creating it...", pushService.destinationRepositoryOwner)
+			_, response, err := pushService.githubEnterpriseClient.Admin.CreateOrg(pushService.ctx, &github.Organization{
+				Login: github.String(pushService.destinationRepositoryOwner),
+				Name:  github.String(pushService.destinationRepositoryOwner),
+			}, user.GetLogin())
+			if err != nil {
+				if response != nil && response.StatusCode == http.StatusNotFound && !githubapiutil.HasAnyScope(response, "site_admin") {
+					return "", usererrors.New("The destination token you have provided does not have the `site_admin` scope, so the destination organization cannot be created.")
+				}
+				return "", githubapiutil.EnrichResponseError(response, err, "Error creating organization.")
+			}
+		}
+
+		_, response, err = pushService.githubEnterpriseClient.Organizations.IsMember(pushService.ctx, pushService.destinationRepositoryOwner, user.GetLogin())
+		if err != nil {
+			return "", githubapiutil.EnrichResponseError(response, err, "Failed to check membership of destination organization.")
+		}
+		if (response.StatusCode == http.StatusFound || response.StatusCode == http.StatusNotFound) && githubapiutil.HasAnyScope(response, "site_admin") {
+			log.Debugf("No access to destination organization (status code %d). Switching to impersonation token for %s...", response.StatusCode, pushService.actionsAdminUser)
+			impersonationToken, response, err := pushService.githubEnterpriseClient.Admin.CreateUserImpersonation(pushService.ctx, pushService.actionsAdminUser, &github.ImpersonateUserOptions{Scopes: []string{minimumRepositoryScope, "workflow"}})
+			if err != nil {
+				return "", githubapiutil.EnrichResponseError(response, err, "Failed to impersonate Actions admin user.")
+			}
+			pushService.destinationToken.AccessToken = impersonationToken.GetToken()
+		}
+	}
+
+	return destinationOrganization, nil
 }
 
 func (pushService *pushService) createRepository() (*github.Repository, error) {
@@ -67,51 +137,9 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 	}
 
 	log.Debug("Ensuring repository exists...")
-	user, response, err := pushService.githubEnterpriseClient.Users.Get(pushService.ctx, "")
+	destinationOrganization, err := pushService.getDestinationOrganization(minimumRepositoryScope)
 	if err != nil {
-		if response != nil && response.StatusCode == http.StatusUnauthorized {
-			return nil, usererrors.New(errorInvalidDestinationToken)
-		}
-		return nil, githubapiutil.EnrichResponseError(response, err, "Error getting current user.")
-	}
-
-	// When creating a repository we can either create it in a named organization or under the current user (represented in go-github by an empty string).
-	destinationOrganization := ""
-	if pushService.destinationRepositoryOwner != user.GetLogin() {
-		destinationOrganization = pushService.destinationRepositoryOwner
-	}
-
-	if destinationOrganization != "" {
-		_, response, err := pushService.githubEnterpriseClient.Organizations.Get(pushService.ctx, pushService.destinationRepositoryOwner)
-		if err != nil && (response == nil || response.StatusCode != http.StatusNotFound) {
-			return nil, githubapiutil.EnrichResponseError(response, err, "Error checking if destination organization exists.")
-		}
-		if response != nil && response.StatusCode == http.StatusNotFound {
-			log.Debugf("The organization %s does not exist. Creating it...", pushService.destinationRepositoryOwner)
-			_, response, err := pushService.githubEnterpriseClient.Admin.CreateOrg(pushService.ctx, &github.Organization{
-				Login: github.String(pushService.destinationRepositoryOwner),
-				Name:  github.String(pushService.destinationRepositoryOwner),
-			}, user.GetLogin())
-			if err != nil {
-				if response != nil && response.StatusCode == http.StatusNotFound && !githubapiutil.HasAnyScope(response, "site_admin") {
-					return nil, usererrors.New("The destination token you have provided does not have the `site_admin` scope, so the destination organization cannot be created.")
-				}
-				return nil, githubapiutil.EnrichResponseError(response, err, "Error creating organization.")
-			}
-		}
-
-		_, response, err = pushService.githubEnterpriseClient.Organizations.IsMember(pushService.ctx, pushService.destinationRepositoryOwner, user.GetLogin())
-		if err != nil {
-			return nil, githubapiutil.EnrichResponseError(response, err, "Failed to check membership of destination organization.")
-		}
-		if (response.StatusCode == http.StatusFound || response.StatusCode == http.StatusNotFound) && githubapiutil.HasAnyScope(response, "site_admin") {
-			log.Debugf("No access to destination organization (status code %d). Switching to impersonation token for %s...", response.StatusCode, pushService.actionsAdminUser)
-			impersonationToken, response, err := pushService.githubEnterpriseClient.Admin.CreateUserImpersonation(pushService.ctx, pushService.actionsAdminUser, &github.ImpersonateUserOptions{Scopes: []string{minimumRepositoryScope, "workflow"}})
-			if err != nil {
-				return nil, githubapiutil.EnrichResponseError(response, err, "Failed to impersonate Actions admin user.")
-			}
-			pushService.destinationToken.AccessToken = impersonationToken.GetToken()
-		}
+		return nil, err
 	}
 
 	repository, response, err := pushService.githubEnterpriseClient.Repositories.Get(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName)
@@ -140,6 +168,9 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 		log.Debug("Repository does not exist. Creating it...")
 		repository, response, err = pushService.githubEnterpriseClient.Repositories.Create(pushService.ctx, destinationOrganization, &desiredRepositoryProperties)
 		if err != nil {
+			if pushService.isGitHubAppAccessError(response) {
+				return nil, githubapiutil.EnrichResponseError(response, err, "Error creating destination repository. "+errorGitHubAppAccess)
+			}
 			if response.StatusCode == http.StatusNotFound && !githubapiutil.HasAnyScope(response, acceptableRepositoryScopes...) {
 				return nil, fmt.Errorf("The destination token you have provided does not have the `%s` scope.", minimumRepositoryScope)
 			}
@@ -149,6 +180,9 @@ func (pushService *pushService) createRepository() (*github.Repository, error) {
 		log.Debug("Repository already exists. Updating its metadata...")
 		repository, response, err = pushService.githubEnterpriseClient.Repositories.Edit(pushService.ctx, pushService.destinationRepositoryOwner, pushService.destinationRepositoryName, &desiredRepositoryProperties)
 		if err != nil {
+			if pushService.isGitHubAppAccessError(response) {
+				return nil, githubapiutil.EnrichResponseError(response, err, "Error updating destination repository. "+errorGitHubAppAccess)
+			}
 			if response.StatusCode == http.StatusNotFound {
 				if !githubapiutil.HasAnyScope(response, acceptableRepositoryScopes...) {
 					return nil, fmt.Errorf("The destination token you have provided does not have the `%s` scope.", minimumRepositoryScope)
@@ -433,7 +467,7 @@ func (pushService *pushService) pushReleases() error {
 	return nil
 }
 
-func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, destinationURL string, destinationToken string, destinationRepository string, actionsAdminUser string, force bool, pushSSH bool, gitURL string) error {
+func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, destinationURL string, destinationToken string, destinationRepository string, actionsAdminUser string, force bool, pushSSH bool, gitURL string, githubAppAuth bool) error {
 	err := cacheDirectory.CheckOrCreateVersionFile(false, version.Version())
 	if err != nil {
 		return err
@@ -492,6 +526,7 @@ func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, des
 		force:                      force,
 		pushSSH:                    pushSSH,
 		gitURL:                     gitURL,
+		githubAppAuth:              githubAppAuth,
 	}
 
 	repository, err := pushService.createRepository()
