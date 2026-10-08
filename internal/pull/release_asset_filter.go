@@ -144,6 +144,15 @@ func (filter releaseAssetFilter) selectAssets(releaseTag string, assets []*githu
 	}
 
 	if filter.bundleArchiveFormat != "" {
+		for _, platform := range releaseAssetPlatforms {
+			if !filter.includePlatforms[platform] {
+				continue
+			}
+			name := "codeql-bundle-" + platform
+			if !primaryFormats[name][filter.bundleArchiveFormat] {
+				return nil, nil, fmt.Errorf("release %s does not publish required asset %s.%s", releaseTag, name, filter.bundleArchiveFormat)
+			}
+		}
 		for name, formats := range primaryFormats {
 			item := classifyReleaseAsset(name + "." + firstFormat(formats))
 			if item.combined && filter.filtersPlatforms() {

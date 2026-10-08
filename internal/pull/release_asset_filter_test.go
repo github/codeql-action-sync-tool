@@ -131,3 +131,42 @@ func TestReleaseAssetFilterFailsWhenPrimaryFormatIsMissing(t *testing.T) {
 	))
 	require.EqualError(t, err, "release codeql-bundle-v1.2.3 does not publish required asset codeql-bundle-win64.tar.zst")
 }
+
+func TestReleaseAssetFilterRequiresEveryIncludedPlatform(t *testing.T) {
+	cases := []struct {
+		name   string
+		assets []string
+	}{
+		{
+			name:   "platform absent",
+			assets: []string{"codeql-bundle-linux64.tar.gz", "codeql-bundle.tar.gz", "cli-version.txt"},
+		},
+		{
+			name:   "checksum without archive",
+			assets: []string{"codeql-bundle-linux64.tar.gz", "codeql-bundle-win64.tar.gz.checksum.txt"},
+		},
+		{
+			name:   "language bundle without primary archive",
+			assets: []string{"codeql-bundle-linux64.tar.gz", "codeql-bundle-csharp-win64.tar.gz"},
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			filter, err := newReleaseAssetFilter([]string{"linux64", "win64"}, nil, "tar.gz")
+			require.NoError(t, err)
+
+			_, _, err = filter.selectAssets("codeql-bundle-v1.2.3", releaseAssets(testCase.assets...))
+			require.EqualError(t, err, "release codeql-bundle-v1.2.3 does not publish required asset codeql-bundle-win64.tar.gz")
+		})
+	}
+}
+
+func TestReleaseAssetFilterAllowsAbsentPlatformsWithoutFormatRestriction(t *testing.T) {
+	filter, err := newReleaseAssetFilter([]string{"linux64", "win64"}, nil, "")
+	require.NoError(t, err)
+	assets := releaseAssets("codeql-bundle-linux64.tar.gz", "cli-version.txt")
+
+	selected, _, err := filter.selectAssets("release", assets)
+	require.NoError(t, err)
+	require.Equal(t, releaseAssetNames(assets), releaseAssetNames(selected))
+}

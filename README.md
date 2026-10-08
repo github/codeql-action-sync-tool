@@ -50,7 +50,7 @@ To sync every platform except macOS:
   --exclude-platforms osx64
 ```
 
-With none of these flags, the tool continues to copy every release asset. Platform filters also apply to platform-specific checksums, language bundles, and update-job proxies. Non-archive metadata is retained, while the combined all-platform CodeQL bundle is omitted when a platform filter is active. The archive format flag applies only to CodeQL bundles; update-job proxies retain their published format. If a required platform bundle is not published in the requested format, the command fails rather than silently falling back.
+With none of these flags, the tool continues to copy every release asset. Platform filters also apply to platform-specific checksums, language bundles, and update-job proxies. Non-archive metadata is retained, while the combined all-platform CodeQL bundle is omitted when a platform filter is active. The archive format flag applies only to CodeQL bundles; update-job proxies retain their published format. If a required platform bundle is not published in the requested format, the command fails rather than silently falling back. When an archive format is specified, every explicitly included platform must publish a primary bundle in that format, even if the release has no assets for that platform at all.
 
 These flags limit new downloads and uploads. They do not delete assets copied to GitHub Enterprise Server by an earlier sync.
 
