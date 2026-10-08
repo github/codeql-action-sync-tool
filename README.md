@@ -29,6 +29,30 @@ From a machine with access to both GitHub.com and GitHub Enterprise Server use t
 * `--actions-admin-user` - The name of the Actions admin user, which will be used if you are updating the bundled CodeQL Action. If not specified `actions-admin` will be used.
 * `--force` - By default the tool will not overwrite existing repositories. Providing this flag will allow it to.
 * `--push-ssh` - Push Git contents over SSH rather than HTTPS. To use this option you must have SSH access to your GitHub Enterprise instance configured.
+* `--include-platforms` - Only download release assets for the listed platforms. Valid values are `linux64`, `linux-arm64`, `osx64`, and `win64`.
+* `--exclude-platforms` - Download release assets for every platform except those listed. This cannot be used with `--include-platforms`.
+* `--bundle-archive-format` - Only download CodeQL bundles in the selected format. Valid values are `tar.gz` and `tar.zst`.
+
+Platform lists are comma-separated. For example, the following syncs Linux x64 and Windows assets, omits the combined all-platform bundle, and downloads CodeQL bundles only as gzip archives:
+
+```shell
+./codeql-action-sync sync \
+  --destination-url https://github.example.com \
+  --include-platforms linux64,win64 \
+  --bundle-archive-format tar.gz
+```
+
+To sync every platform except macOS:
+
+```shell
+./codeql-action-sync sync \
+  --destination-url https://github.example.com \
+  --exclude-platforms osx64
+```
+
+With none of these flags, the tool continues to copy every release asset. Platform filters also apply to platform-specific checksums, language bundles, and update-job proxies. Non-archive metadata is retained, while the combined all-platform CodeQL bundle is omitted when a platform filter is active. The archive format flag applies only to CodeQL bundles; update-job proxies retain their published format. If a required platform bundle is not published in the requested format, the command fails rather than silently falling back.
+
+These flags limit new downloads and uploads. They do not delete assets copied to GitHub Enterprise Server by an earlier sync.
 
 ### I don't have a machine that can access both GitHub.com and GitHub Enterprise Server.
 From a machine with access to GitHub.com use the `./codeql-action-sync pull` command to download a copy of the CodeQL Action and bundles to a local folder.
@@ -36,6 +60,11 @@ From a machine with access to GitHub.com use the `./codeql-action-sync pull` com
 **Optional Arguments:**
 * `--cache-dir` - The directory in which to store data downloaded from GitHub.com. If not specified a directory next to the sync tool will be used.
 * `--source-token` - A token to access the API of GitHub.com. This is normally not required, but can be provided if you have issues with API rate limiting. The token does not need to have any scopes.
+* `--include-platforms` - Only download release assets for the listed platforms. Valid values are `linux64`, `linux-arm64`, `osx64`, and `win64`.
+* `--exclude-platforms` - Download release assets for every platform except those listed. This cannot be used with `--include-platforms`.
+* `--bundle-archive-format` - Only download CodeQL bundles in the selected format. Valid values are `tar.gz` and `tar.zst`.
+
+The filtering semantics are the same as for `sync` above. Reusing a cache with different filters removes now-excluded local assets before the cache can be pushed.
 
 Next copy the sync tool and cache directory to another machine which has access to GitHub Enterprise Server.
 

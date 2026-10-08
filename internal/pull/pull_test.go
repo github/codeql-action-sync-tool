@@ -4,11 +4,15 @@ import (
 	"context"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"path"
+	"strconv"
 	"testing"
 
 	"github.com/github/codeql-action-sync/internal/cachedirectory"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 
 	"github.com/github/codeql-action-sync/test"
@@ -189,4 +193,66 @@ func TestPullReleases(t *testing.T) {
 
 	test.RequireFileHasContent(t, releaseSomeCodeQLVersionOnMainContent, pullService.cacheDirectory.AssetPath("some-codeql-version-on-main", "codeql-bundle.tar.gz"))
 	test.RequireFileHasContent(t, releaseSomeCodeQLVersionOnV1AndV2Content, pullService.cacheDirectory.AssetPath("some-codeql-version-on-v1-and-v2", "codeql-bundle.tar.gz"))
+}
+
+func TestPullReleasesFiltersAndPrunesCache(t *testing.T) {
+	temporaryDirectory := test.CreateTemporaryDirectory(t)
+	githubTestServer, githubURL := test.GetTestHTTPServer(t)
+	contents := map[int]string{
+		10: "linux zstd",
+		13: "version metadata",
+		14: "linux proxy",
+		20: "other linux zstd",
+	}
+	mainRelease := github.RepositoryRelease{
+		TagName: github.String("some-codeql-version-on-main"),
+		Assets: []*github.ReleaseAsset{
+			{ID: github.Int64(10), Name: github.String("codeql-bundle-linux64.tar.zst"), Size: github.Int(len(contents[10]))},
+			{ID: github.Int64(11), Name: github.String("codeql-bundle-linux64.tar.gz"), Size: github.Int(1)},
+			{ID: github.Int64(12), Name: github.String("codeql-bundle.tar.zst"), Size: github.Int(1)},
+			{ID: github.Int64(13), Name: github.String("cli-version-2.27.2.txt"), Size: github.Int(len(contents[13]))},
+			{ID: github.Int64(14), Name: github.String("update-job-proxy-linux64.tar.gz"), Size: github.Int(len(contents[14]))},
+			{ID: github.Int64(15), Name: github.String("codeql-bundle-win64.tar.zst"), Size: github.Int(1)},
+		},
+	}
+	otherRelease := github.RepositoryRelease{
+		TagName: github.String("some-codeql-version-on-v1-and-v2"),
+		Assets: []*github.ReleaseAsset{
+			{ID: github.Int64(20), Name: github.String("codeql-bundle-linux64.tar.zst"), Size: github.Int(len(contents[20]))},
+		},
+	}
+	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/tags/some-codeql-version-on-main", func(response http.ResponseWriter, request *http.Request) {
+		test.ServeHTTPResponseFromObject(t, mainRelease, response)
+	}).Methods("GET")
+	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/tags/some-codeql-version-on-v1-and-v2", func(response http.ResponseWriter, request *http.Request) {
+		test.ServeHTTPResponseFromObject(t, otherRelease, response)
+	}).Methods("GET")
+	githubTestServer.HandleFunc("/api/v3/repos/github/codeql-action/releases/assets/{id:[0-9]+}", func(response http.ResponseWriter, request *http.Request) {
+		id, err := strconv.Atoi(mux.Vars(request)["id"])
+		require.NoError(t, err)
+		content, expected := contents[id]
+		require.True(t, expected, "asset %d should have been filtered", id)
+		test.ServeHTTPResponseFromString(t, content, response)
+	}).Methods("GET").Headers("accept", "application/octet-stream")
+
+	pullService := getTestPullService(t, temporaryDirectory, initialActionRepository, githubURL)
+	pullService.assetFilter, _ = newReleaseAssetFilter([]string{"linux64"}, nil, "tar.zst")
+	err := pullService.pullGit(true)
+	require.NoError(t, err)
+	staleAssetsPath := pullService.cacheDirectory.AssetsPath("some-codeql-version-on-main")
+	require.NoError(t, os.MkdirAll(staleAssetsPath, 0755))
+	staleAssetPath := path.Join(staleAssetsPath, "codeql-bundle-osx64.tar.gz")
+	require.NoError(t, ioutil.WriteFile(staleAssetPath, []byte("stale"), 0644))
+
+	err = pullService.pullReleases()
+	require.NoError(t, err)
+
+	require.NoFileExists(t, staleAssetPath)
+	test.RequireFileHasContent(t, contents[10], pullService.cacheDirectory.AssetPath("some-codeql-version-on-main", "codeql-bundle-linux64.tar.zst"))
+	test.RequireFileHasContent(t, contents[13], pullService.cacheDirectory.AssetPath("some-codeql-version-on-main", "cli-version-2.27.2.txt"))
+	test.RequireFileHasContent(t, contents[14], pullService.cacheDirectory.AssetPath("some-codeql-version-on-main", "update-job-proxy-linux64.tar.gz"))
+	require.NoFileExists(t, pullService.cacheDirectory.AssetPath("some-codeql-version-on-main", "codeql-bundle-linux64.tar.gz"))
+	require.NoFileExists(t, pullService.cacheDirectory.AssetPath("some-codeql-version-on-main", "codeql-bundle.tar.zst"))
+	require.NoFileExists(t, pullService.cacheDirectory.AssetPath("some-codeql-version-on-main", "codeql-bundle-win64.tar.zst"))
+	test.RequireFileHasContent(t, contents[20], pullService.cacheDirectory.AssetPath("some-codeql-version-on-v1-and-v2", "codeql-bundle-linux64.tar.zst"))
 }

@@ -33,6 +33,7 @@ func getTestPushService(t *testing.T, cacheDirectoryString string, githubEnterpr
 	} else {
 		githubEnterpriseClient = nil
 	}
+
 	token := oauth2.Token{AccessToken: "token"}
 	return pushService{
 		ctx:                        context.Background(),
@@ -42,6 +43,14 @@ func getTestPushService(t *testing.T, cacheDirectoryString string, githubEnterpr
 		destinationRepositoryName:  "destination-repository-name",
 		destinationToken:           &token,
 	}
+}
+
+func TestValidateArguments(t *testing.T) {
+	require.EqualError(t, ValidateArguments("", "token", "owner/repository"), "The destination URL must be a full HTTP or HTTPS URL, for example `https://github.example.com`.")
+	require.EqualError(t, ValidateArguments("github.example.com", "token", "owner/repository"), "The destination URL must be a full HTTP or HTTPS URL, for example `https://github.example.com`.")
+	require.EqualError(t, ValidateArguments("https://github.example.com", "", "owner/repository"), "The destination token cannot be empty.")
+	require.EqualError(t, ValidateArguments("https://github.example.com", "token", "repository"), "The destination repository must be in `owner/repository` format.")
+	require.NoError(t, ValidateArguments("https://github.example.com", "token", "owner/repository"))
 }
 
 func TestCreateRepositoryWhenUserIsOwner(t *testing.T) {
