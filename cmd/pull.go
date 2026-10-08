@@ -33,5 +33,5 @@ func (f *pullFlagFields) Init(cmd *cobra.Command) {
 	cmd.Flags().MarkHidden("source-url")
 	cmd.Flags().StringSliceVar(&f.includePlatforms, "include-platforms", nil, "Only download release assets for these platforms: linux64, linux-arm64, osx64, win64.")
 	cmd.Flags().StringSliceVar(&f.excludePlatforms, "exclude-platforms", nil, "Download release assets for every platform except these: linux64, linux-arm64, osx64, win64.")
-	cmd.Flags().StringVar(&f.bundleArchiveFormat, "bundle-archive-format", "", "Only download CodeQL bundles in this archive format: tar.gz or tar.zst.")
+	cmd.Flags().StringVar(&f.bundleArchiveFormat, "bundle-archive-format", "", "Only download CodeQL bundles in this archive format: tar.gz or tar.zst. Requires an explicit tools URL in CodeQL workflows.")
 }

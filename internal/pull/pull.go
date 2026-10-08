@@ -186,6 +186,9 @@ func (pullService *pullService) findRelevantReleases() ([]string, error) {
 
 func (pullService *pullService) pullReleases() error {
 	log.Debug("Pulling CodeQL bundles...")
+	if pullService.assetFilter.bundleArchiveFormat != "" {
+		log.Warnf("--bundle-archive-format %s does not change the CodeQL Action's automatic archive selection. Configure the CodeQL init step's tools input with an explicit URL for a synced bundle; otherwise air-gapped runners may attempt to download an excluded format from GitHub.com.", pullService.assetFilter.bundleArchiveFormat)
+	}
 	relevantReleases, err := pullService.findRelevantReleases()
 	if err != nil {
 		return err
@@ -277,6 +280,37 @@ func (pullService *pullService) pullReleases() error {
 			_, err = io.Copy(downloadFile, progressReader)
 			if err != nil {
 				return errors.Wrap(err, "Error downloading asset.")
+			}
+		}
+	}
+	return pullService.pruneFilteredCachedAssets()
+}
+
+func (pullService *pullService) pruneFilteredCachedAssets() error {
+	if !pullService.assetFilter.filtersPlatforms() && pullService.assetFilter.bundleArchiveFormat == "" {
+		return nil
+	}
+	cachedReleases, err := ioutil.ReadDir(pullService.cacheDirectory.ReleasesPath())
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return errors.Wrap(err, "Error reading cached releases.")
+	}
+	for _, release := range cachedReleases {
+		cachedAssets, err := ioutil.ReadDir(pullService.cacheDirectory.AssetsPath(release.Name()))
+		if err != nil {
+			return errors.Wrapf(err, "Error reading cached release assets for %s.", release.Name())
+		}
+		for _, asset := range cachedAssets {
+			reason := pullService.assetFilter.exclusionReason(classifyReleaseAsset(asset.Name()))
+			if reason == "" {
+				continue
+			}
+			log.Debugf("Removing cached asset %s from release %s: %s.", asset.Name(), release.Name(), reason)
+			err = os.RemoveAll(pullService.cacheDirectory.AssetPath(release.Name(), asset.Name()))
+			if err != nil {
+				return errors.Wrapf(err, "Error removing filtered cached asset %s from release %s.", asset.Name(), release.Name())
 			}
 		}
 	}

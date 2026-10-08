@@ -116,6 +116,19 @@ func (filter releaseAssetFilter) includesPlatform(platform string) bool {
 	return !filter.excludePlatforms[platform]
 }
 
+func (filter releaseAssetFilter) exclusionReason(item releaseAsset) string {
+	switch {
+	case item.combined && filter.filtersPlatforms():
+		return "combined bundle omitted by platform filter"
+	case item.platform != "" && !filter.includesPlatform(item.platform):
+		return "platform filtered"
+	case item.bundle && item.format != "" && filter.bundleArchiveFormat != "" && item.format != filter.bundleArchiveFormat:
+		return "bundle archive format filtered"
+	default:
+		return ""
+	}
+}
+
 func (filter releaseAssetFilter) selectAssets(releaseTag string, assets []*github.ReleaseAsset) ([]*github.ReleaseAsset, []skippedReleaseAsset, error) {
 	classified := make([]releaseAsset, len(assets))
 	primaryFormats := map[string]map[string]bool{}
@@ -149,15 +162,7 @@ func (filter releaseAssetFilter) selectAssets(releaseTag string, assets []*githu
 	skipped := []skippedReleaseAsset{}
 	for index, asset := range assets {
 		item := classified[index]
-		reason := ""
-		switch {
-		case item.combined && filter.filtersPlatforms():
-			reason = "combined bundle omitted by platform filter"
-		case item.platform != "" && !filter.includesPlatform(item.platform):
-			reason = "platform filtered"
-		case item.bundle && item.format != "" && filter.bundleArchiveFormat != "" && item.format != filter.bundleArchiveFormat:
-			reason = "bundle archive format filtered"
-		}
+		reason := filter.exclusionReason(item)
 		if reason == "" {
 			if item.unclassifiedArchive {
 				log.Debugf("Keeping unclassified release archive %s.", asset.GetName())

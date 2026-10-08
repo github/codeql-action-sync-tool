@@ -31,9 +31,9 @@ From a machine with access to both GitHub.com and GitHub Enterprise Server use t
 * `--push-ssh` - Push Git contents over SSH rather than HTTPS. To use this option you must have SSH access to your GitHub Enterprise instance configured.
 * `--include-platforms` - Only download release assets for the listed platforms. Valid values are `linux64`, `linux-arm64`, `osx64`, and `win64`.
 * `--exclude-platforms` - Download release assets for every platform except those listed. This cannot be used with `--include-platforms`.
-* `--bundle-archive-format` - Only download CodeQL bundles in the selected format. Valid values are `tar.gz` and `tar.zst`.
+* `--bundle-archive-format` - Only download CodeQL bundles in the selected format. Valid values are `tar.gz` and `tar.zst`. Requires explicit `tools` URLs in CodeQL workflows; see [Archive format restrictions](#archive-format-restrictions).
 
-Platform lists are comma-separated. For example, the following syncs Linux x64 and Windows assets, omits the combined all-platform bundle, and downloads CodeQL bundles only as gzip archives:
+Platform lists are comma-separated. For example, the following syncs Linux x64 and Windows assets, omits the combined all-platform bundle, and downloads CodeQL bundles only as gzip archives. Use it only with workflows configured as described in [Archive format restrictions](#archive-format-restrictions):
 
 ```shell
 ./codeql-action-sync sync \
@@ -54,6 +54,21 @@ With none of these flags, the tool continues to copy every release asset. Platfo
 
 These flags limit new downloads and uploads. They do not delete assets copied to GitHub Enterprise Server by an earlier sync.
 
+#### Archive format restrictions
+
+**Warning:** `--bundle-archive-format` controls which bundles are copied, not which archive the CodeQL Action requests. The Action normally chooses gzip on Windows and chooses zstd on Linux/macOS when the CLI and runner support it. If that format was excluded, the Action may try downloading it from GitHub.com, which fails on air-gapped runners. Leave this flag unset to preserve automatic archive selection.
+
+When restricting the format, set the CodeQL init step's `tools` input to an explicit URL for a retained bundle on your destination server. For example, a Linux x64 job using a gzip-only sync:
+
+```yaml
+- uses: github/codeql-action/init@v4
+  with:
+    languages: javascript
+    tools: https://github.example.com/github/codeql-action/releases/download/<bundle-tag>/codeql-bundle-linux64.tar.gz
+```
+
+Replace `<bundle-tag>` with a synced release tag compatible with your Action version, and adjust the host, repository, platform, and archive format for each job. The explicit URL pins the bundle version, so update it when upgrading the bundle. Ensure each runner can extract the selected archive format.
+
 ### I don't have a machine that can access both GitHub.com and GitHub Enterprise Server.
 From a machine with access to GitHub.com use the `./codeql-action-sync pull` command to download a copy of the CodeQL Action and bundles to a local folder.
 
@@ -62,9 +77,9 @@ From a machine with access to GitHub.com use the `./codeql-action-sync pull` com
 * `--source-token` - A token to access the API of GitHub.com. This is normally not required, but can be provided if you have issues with API rate limiting. The token does not need to have any scopes.
 * `--include-platforms` - Only download release assets for the listed platforms. Valid values are `linux64`, `linux-arm64`, `osx64`, and `win64`.
 * `--exclude-platforms` - Download release assets for every platform except those listed. This cannot be used with `--include-platforms`.
-* `--bundle-archive-format` - Only download CodeQL bundles in the selected format. Valid values are `tar.gz` and `tar.zst`.
+* `--bundle-archive-format` - Only download CodeQL bundles in the selected format. Valid values are `tar.gz` and `tar.zst`. Requires explicit `tools` URLs in CodeQL workflows; see [Archive format restrictions](#archive-format-restrictions).
 
-The filtering semantics are the same as for `sync` above. Reusing a cache with different filters removes now-excluded local assets before the cache can be pushed.
+The filtering semantics are the same as for `sync` above. Reusing a cache with different filters removes now-excluded local assets before the cache can be pushed, including assets from historical releases no longer referenced by the current Action defaults. Historical release metadata and matching assets are retained.
 
 Next copy the sync tool and cache directory to another machine which has access to GitHub Enterprise Server.
 
