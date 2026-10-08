@@ -53,6 +53,40 @@ func TestValidateArguments(t *testing.T) {
 	require.NoError(t, ValidateArguments("https://github.example.com", "token", "owner/repository"))
 }
 
+func TestValidateArgumentsRejectsUnsupportedDestinationURLs(t *testing.T) {
+	whitespaceError := "The destination URL cannot contain surrounding whitespace."
+	pathError := "The destination URL must be the root URL of the GitHub Enterprise instance, without a path."
+	cases := []struct {
+		destinationURL string
+		expectedError  string
+	}{
+		{" https://github.example.com", whitespaceError},
+		{"https://github.example.com ", whitespaceError},
+		{"https://github.example.com/prefix", pathError},
+		{"https://github.example.com/api/v3", pathError},
+		{"https://github.example.com/%2F", pathError},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.destinationURL, func(t *testing.T) {
+			require.EqualError(t, ValidateArguments(testCase.destinationURL, "token", "owner/repository"), testCase.expectedError)
+		})
+	}
+}
+
+func TestValidateArgumentsAcceptsSupportedDestinationURLs(t *testing.T) {
+	for _, destinationURL := range []string{
+		"https://github.example.com/",
+		"https://github.example.com///",
+		"http://github.example.com:8080/",
+		"https://github.example.com?tenant=1",
+		"https://github.example.com#fragment",
+	} {
+		t.Run(destinationURL, func(t *testing.T) {
+			require.NoError(t, ValidateArguments(destinationURL, "token", "owner/repository"))
+		})
+	}
+}
+
 func TestCreateRepositoryWhenUserIsOwner(t *testing.T) {
 	temporaryDirectory := test.CreateTemporaryDirectory(t)
 	githubTestServer, githubEnterpriseURL := test.GetTestHTTPServer(t)
