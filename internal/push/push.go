@@ -434,7 +434,11 @@ func (pushService *pushService) pushReleases() error {
 }
 
 func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, destinationURL string, destinationToken string, destinationRepository string, actionsAdminUser string, force bool, pushSSH bool, gitURL string) error {
-	err := cacheDirectory.CheckOrCreateVersionFile(false, version.Version())
+	err := ValidateArguments(destinationURL, destinationToken, destinationRepository)
+	if err != nil {
+		return err
+	}
+	err = cacheDirectory.CheckOrCreateVersionFile(false, version.Version())
 	if err != nil {
 		return err
 	}
@@ -517,5 +521,26 @@ func Push(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, des
 		return err
 	}
 	log.Infof("Finished pushing CodeQL Action to %s!", destinationRepository)
+	return nil
+}
+
+func ValidateArguments(destinationURL string, destinationToken string, destinationRepository string) error {
+	if destinationURL != strings.TrimSpace(destinationURL) {
+		return usererrors.New("The destination URL cannot contain surrounding whitespace.")
+	}
+	parsedDestinationURL, err := url.Parse(destinationURL)
+	if err != nil || (parsedDestinationURL.Scheme != "http" && parsedDestinationURL.Scheme != "https") || parsedDestinationURL.Host == "" {
+		return usererrors.New("The destination URL must be a full HTTP or HTTPS URL, for example `https://github.example.com`.")
+	}
+	if strings.TrimRight(parsedDestinationURL.EscapedPath(), "/") != "" || parsedDestinationURL.RawQuery != "" || parsedDestinationURL.Fragment != "" {
+		return usererrors.New("The destination URL must be the root URL of the GitHub Enterprise instance, without a path, query, or fragment.")
+	}
+	if strings.TrimSpace(destinationToken) == "" {
+		return usererrors.New("The destination token cannot be empty.")
+	}
+	destinationRepositorySplit := strings.Split(destinationRepository, "/")
+	if len(destinationRepositorySplit) != 2 || destinationRepositorySplit[0] == "" || destinationRepositorySplit[1] == "" {
+		return usererrors.New("The destination repository must be in `owner/repository` format.")
+	}
 	return nil
 }

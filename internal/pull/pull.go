@@ -42,6 +42,7 @@ type pullService struct {
 	gitCloneURL        string
 	githubDotComClient *github.Client
 	sourceToken        string
+	assetFilter        releaseAssetFilter
 }
 
 func (pullService *pullService) pullGit(fresh bool) error {
@@ -185,6 +186,9 @@ func (pullService *pullService) findRelevantReleases() ([]string, error) {
 
 func (pullService *pullService) pullReleases() error {
 	log.Debug("Pulling CodeQL bundles...")
+	if pullService.assetFilter.bundleArchiveFormat != "" {
+		log.Warnf("--bundle-archive-format %s does not change the CodeQL Action's automatic archive selection. Configure the CodeQL init step's tools input with an explicit URL for a synced bundle; otherwise air-gapped runners may attempt to download an excluded format from GitHub.com.", pullService.assetFilter.bundleArchiveFormat)
+	}
 	relevantReleases, err := pullService.findRelevantReleases()
 	if err != nil {
 		return err
@@ -196,6 +200,11 @@ func (pullService *pullService) pullReleases() error {
 		if err != nil {
 			return githubapiutil.EnrichResponseError(response, err, "Error loading CodeQL release information.")
 		}
+		selectedAssets, skippedAssets, err := pullService.assetFilter.selectAssets(releaseTag, release.Assets)
+		if err != nil {
+			return err
+		}
+		logAssetSelection(releaseTag, len(release.Assets), len(selectedAssets), skippedAssets)
 		err = os.MkdirAll(pullService.cacheDirectory.ReleasePath(releaseTag), 0755)
 		if err != nil {
 			return errors.Wrap(err, "Error creating releases directory.")
@@ -214,7 +223,24 @@ func (pullService *pullService) pullReleases() error {
 		if err != nil {
 			return errors.Wrap(err, "Error creating assets directory.")
 		}
-		for _, asset := range release.Assets {
+		selectedAssetNames := map[string]bool{}
+		for _, asset := range selectedAssets {
+			selectedAssetNames[asset.GetName()] = true
+		}
+		cachedAssets, err := ioutil.ReadDir(assetsPath)
+		if err != nil {
+			return errors.Wrap(err, "Error reading cached release assets.")
+		}
+		for _, cachedAsset := range cachedAssets {
+			if !selectedAssetNames[cachedAsset.Name()] {
+				log.Debugf("Removing filtered cached asset %s...", cachedAsset.Name())
+				err = os.RemoveAll(pullService.cacheDirectory.AssetPath(releaseTag, cachedAsset.Name()))
+				if err != nil {
+					return errors.Wrap(err, "Error removing filtered cached asset.")
+				}
+			}
+		}
+		for _, asset := range selectedAssets {
 			log.Debugf("Downloading asset %s...", asset.GetName())
 			downloadPath := pullService.cacheDirectory.AssetPath(releaseTag, asset.GetName())
 			downloadPathStat, err := os.Stat(downloadPath)
@@ -257,11 +283,46 @@ func (pullService *pullService) pullReleases() error {
 			}
 		}
 	}
+	return pullService.pruneFilteredCachedAssets()
+}
+
+func (pullService *pullService) pruneFilteredCachedAssets() error {
+	if !pullService.assetFilter.filtersPlatforms() && pullService.assetFilter.bundleArchiveFormat == "" {
+		return nil
+	}
+	cachedReleases, err := ioutil.ReadDir(pullService.cacheDirectory.ReleasesPath())
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return errors.Wrap(err, "Error reading cached releases.")
+	}
+	for _, release := range cachedReleases {
+		cachedAssets, err := ioutil.ReadDir(pullService.cacheDirectory.AssetsPath(release.Name()))
+		if err != nil {
+			return errors.Wrapf(err, "Error reading cached release assets for %s.", release.Name())
+		}
+		for _, asset := range cachedAssets {
+			reason := pullService.assetFilter.exclusionReason(classifyReleaseAsset(asset.Name()))
+			if reason == "" {
+				continue
+			}
+			log.Debugf("Removing cached asset %s from release %s: %s.", asset.Name(), release.Name(), reason)
+			err = os.RemoveAll(pullService.cacheDirectory.AssetPath(release.Name(), asset.Name()))
+			if err != nil {
+				return errors.Wrapf(err, "Error removing filtered cached asset %s from release %s.", asset.Name(), release.Name())
+			}
+		}
+	}
 	return nil
 }
 
-func Pull(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, sourceToken string, sourceURL string) error {
-	err := cacheDirectory.CheckOrCreateVersionFile(true, version.Version())
+func Pull(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, sourceToken string, sourceURL string, includePlatforms []string, excludePlatforms []string, bundleArchiveFormat string) error {
+	assetFilter, err := newReleaseAssetFilter(includePlatforms, excludePlatforms, bundleArchiveFormat)
+	if err != nil {
+		return err
+	}
+	err = cacheDirectory.CheckOrCreateVersionFile(true, version.Version())
 	if err != nil {
 		return err
 	}
@@ -288,6 +349,7 @@ func Pull(ctx context.Context, cacheDirectory cachedirectory.CacheDirectory, sou
 		gitCloneURL:        sourceURL,
 		githubDotComClient: github.NewClient(tokenClient),
 		sourceToken:        sourceToken,
+		assetFilter:        assetFilter,
 	}
 
 	err = pullService.pullGit(false)

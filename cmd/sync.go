@@ -13,8 +13,12 @@ var syncCmd = &cobra.Command{
 	Short: "Sync the CodeQL Action from GitHub to a GitHub Enterprise Server installation.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		version.LogVersion()
+		err := push.ValidateArguments(pushFlags.destinationURL, pushFlags.destinationToken, pushFlags.destinationRepository)
+		if err != nil {
+			return err
+		}
 		cacheDirectory := cachedirectory.NewCacheDirectory(rootFlags.cacheDir)
-		err := pull.Pull(cmd.Context(), cacheDirectory, pullFlags.sourceToken, pullFlags.sourceURL)
+		err = pull.Pull(cmd.Context(), cacheDirectory, pullFlags.sourceToken, pullFlags.sourceURL, pullFlags.includePlatforms, pullFlags.excludePlatforms, pullFlags.bundleArchiveFormat)
 		if err != nil {
 			return err
 		}

@@ -33,6 +33,7 @@ func getTestPushService(t *testing.T, cacheDirectoryString string, githubEnterpr
 	} else {
 		githubEnterpriseClient = nil
 	}
+
 	token := oauth2.Token{AccessToken: "token"}
 	return pushService{
 		ctx:                        context.Background(),
@@ -41,6 +42,48 @@ func getTestPushService(t *testing.T, cacheDirectoryString string, githubEnterpr
 		destinationRepositoryOwner: "destination-repository-owner",
 		destinationRepositoryName:  "destination-repository-name",
 		destinationToken:           &token,
+	}
+}
+
+func TestValidateArguments(t *testing.T) {
+	require.EqualError(t, ValidateArguments("", "token", "owner/repository"), "The destination URL must be a full HTTP or HTTPS URL, for example `https://github.example.com`.")
+	require.EqualError(t, ValidateArguments("github.example.com", "token", "owner/repository"), "The destination URL must be a full HTTP or HTTPS URL, for example `https://github.example.com`.")
+	require.EqualError(t, ValidateArguments("https://github.example.com", "", "owner/repository"), "The destination token cannot be empty.")
+	require.EqualError(t, ValidateArguments("https://github.example.com", "token", "repository"), "The destination repository must be in `owner/repository` format.")
+	require.NoError(t, ValidateArguments("https://github.example.com", "token", "owner/repository"))
+}
+
+func TestValidateArgumentsRejectsUnsupportedDestinationURLs(t *testing.T) {
+	whitespaceError := "The destination URL cannot contain surrounding whitespace."
+	rootURLError := "The destination URL must be the root URL of the GitHub Enterprise instance, without a path, query, or fragment."
+	cases := []struct {
+		destinationURL string
+		expectedError  string
+	}{
+		{" https://github.example.com", whitespaceError},
+		{"https://github.example.com ", whitespaceError},
+		{"https://github.example.com/prefix", rootURLError},
+		{"https://github.example.com/api/v3", rootURLError},
+		{"https://github.example.com/%2F", rootURLError},
+		{"https://github.example.com?tenant=1", rootURLError},
+		{"https://github.example.com#fragment", rootURLError},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.destinationURL, func(t *testing.T) {
+			require.EqualError(t, ValidateArguments(testCase.destinationURL, "token", "owner/repository"), testCase.expectedError)
+		})
+	}
+}
+
+func TestValidateArgumentsAcceptsSupportedDestinationURLs(t *testing.T) {
+	for _, destinationURL := range []string{
+		"https://github.example.com/",
+		"https://github.example.com///",
+		"http://github.example.com:8080/",
+	} {
+		t.Run(destinationURL, func(t *testing.T) {
+			require.NoError(t, ValidateArguments(destinationURL, "token", "owner/repository"))
+		})
 	}
 }
 
